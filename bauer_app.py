@@ -50,22 +50,12 @@ st.markdown("""
 
 # ── Constants ────────────────────────────────────────────────────────────────
 
+R_INNER = 57.5
+R_OUTER = 146.0
 N       = 600
 COLORS  = ["#4c9ec4", "#c9a050", "#6db87a", "#c96e85", "#9b84c9", "#d4856a"]
 
-# Groove radius presets  (name: (r_inner, r_outer))
-OUTER_PRESETS = {
-    "12″ IEC 1958 / RIAA 1963  (146.05 mm)": 146.05,
-    "12″ IEC 1964 / DIN        (146.3 mm)":  146.30,
-    "12″ JIS 1981              (146.6 mm)":  146.60,
-    "10″ IEC 1987              (120.9 mm)":  120.90,
-    "7″  IEC 1987              (84.15 mm)":   84.15,
-}
-INNER_PRESETS = {
-    "IEC 1958 / RIAA 1963  (60.325 mm)": 60.325,
-    "JIS 1981              (57.6 mm)":    57.60,
-    "DIN                   (57.5 mm)":    57.50,
-}
+r_arr = np.linspace(R_INNER, R_OUTER, N)
 
 # ── Physics ───────────────────────────────────────────────────────────────────
 
@@ -96,95 +86,6 @@ def make_label(D):
         return "D = 0 mm"
     return f"D = {'+' if D > 0 else ''}{D:.2f} mm"
 
-# ── Classic alignment solvers ─────────────────────────────────────────────────
-#
-# All three alignments place two null radii (r1_null, r2_null) where tracking
-# error α = 0.  Given those two radii and effective length l, the (β, D) pair
-# follows from Bauer Eqs (17)–(20):
-#
-#   φ1 = r1/(2l) + D/r1   [rad, small-angle Eq.5 — accurate enough for β/D solve]
-#   φ2 = r2/(2l) + D/r2
-#   β  = (φ1·r2² − φ2·r1²) / (r2² − r1²)   [rad]  Eq.(20) rearranged
-#   D  = (β − φ1) * ... solved from equal-slope condition
-#
-# We use the exact Eq.(4) iteratively: given null radii, solve for D so that
-# φ(r1_null) = φ(r2_null) = β, by minimising the residual with scipy or a
-# simple analytical Löfgren formula.
-#
-# Analytical closed-form (Löfgren / Baerwald — exact for the small-angle approx):
-#   D = (r1_null² + r2_null²) / (2*l) * correction   — we use the exact version
-#   β_rad = r1_null/(2l) + D/r1_null  (evaluated at null, where φ = β)
-#
-# Null radii by alignment standard (IEC 60098, Löfgren, Stevenson):
-
-ALIGNMENTS = {
-    "Löfgren A (IEC / Baerwald)": {
-        # Minimises RMS distortion — nulls at Baerwald radii
-        # r_null = sqrt( (r_inner² + r_outer²) / 2 ) and geometric mean variant
-        # Standard IEC 60098 inner=60.325 mm, outer=146.05 mm for 12" LP
-        # Null radii: Löfgren A formula
-        "r1_null_frac": lambda ri, ro: np.sqrt((ri**2 + ro**2 - np.sqrt((ri**2 + ro**2)**2 - (4/3)*ri**2*ro**2)) / (2/3 * 1)),
-        "description": "Minimises RMS tracking error — standard IEC alignment",
-        "color": "#f0c040",
-        "dash": "dashdot",
-    },
-    "Löfgren B": {
-        # Minimises peak tracking error — equal absolute peaks at 3 points
-        "description": "Minimises peak tracking error (min-max / Chebyshev)",
-        "color": "#7ec8a0",
-        "dash": "dashdot",
-    },
-    "Stevenson": {
-        # One null at inner groove, peak at outer = 0 (no error at outer groove)
-        "description": "Zero tracking error at outer groove — reduces end-of-side distortion",
-        "color": "#c07ef0",
-        "dash": "dashdot",
-    },
-}
-
-def solve_alignment(name, l, r_inner, r_outer):
-    """
-    Return (beta_deg, D_mm, r1_null, r2_null) for a named alignment.
-
-    D    = r1_null · r2_null / (2l)
-    β    = r1_null/(2l) + D/r1_null  [from Bauer Eq.5 at the null radius]
-
-    Löfgren A (Baerwald / IEC):  minimises ∫(α/r)² dr
-        a = (ri²+ro²)/2
-        b = ri²·ro²·(1 − (ri²+ro²)/(6l²))
-        r1 = √(a − √(a²−b)),   r2 = √(a + √(a²−b))
-
-    Löfgren B:  minimises peak |α|  (equal peaks at ri and ro)
-        r1 = (ri² · √(ri·ro))^(1/3)
-        r2 = (ro² · √(ri·ro))^(1/3)
-
-    Stevenson:  zero error at outer groove  (r2 = ro)
-        r1 = √(2·ri²·ro² / (ri²+ro²))
-
-    Reference: Löfgren (1938); Baerwald (1941); Stevenson (1966).
-    """
-    ri, ro = r_inner, r_outer
-
-    if name == "Löfgren A (IEC / Baerwald)":
-        a    = (ri**2 + ro**2) / 2.0
-        b    = ri**2 * ro**2 * (1.0 - (ri**2 + ro**2) / (6.0 * l**2))
-        disc = max(a**2 - b, 0.0)
-        r1_null = np.sqrt(a - np.sqrt(disc))
-        r2_null = np.sqrt(a + np.sqrt(disc))
-
-    elif name == "Löfgren B":
-        gm      = np.sqrt(ri * ro)
-        r1_null = (ri**2 * gm) ** (1.0 / 3.0)
-        r2_null = (ro**2 * gm) ** (1.0 / 3.0)
-
-    elif name == "Stevenson":
-        r2_null = ro
-        r1_null = np.sqrt(2.0 * ri**2 * ro**2 / (ri**2 + ro**2))
-
-    D_mm     = r1_null * r2_null / (2.0 * l)
-    beta_deg = np.degrees(r1_null / (2.0 * l) + D_mm / r1_null)
-    return beta_deg, D_mm, r1_null, r2_null
-
 # ── Plotly theme helper ───────────────────────────────────────────────────────
 
 LAYOUT_BASE = dict(
@@ -208,49 +109,6 @@ def hline(y, color="#32373f"):
     return dict(type="line", xref="paper", x0=0, x1=1, y0=y, y1=y,
                 line=dict(color=color, width=0.8, dash="dot"))
 
-def add_ref_trace(fig, mode, **kw):
-    """
-    Add the selected reference alignment curve to a figure.
-    mode: 'phi'   → plot tracking angle φ in degrees
-          'alpha' → plot tracking error α = φ − β_ref in degrees
-          'skating' → plot µ·tan(φ)×100 %
-          'distortion' → plot Bauer Eq.16 HD2 %
-    kw: L, MU, V_MOD, omega_r, ref_beta, ref_D, ref_color, ref_choice, r_arr
-    """
-    if not kw.get("show_ref"):
-        return
-    L        = kw["L"]
-    r_arr    = kw["r_arr"]
-    ref_D    = kw["ref_D"]
-    ref_beta = kw["ref_beta"]   # degrees
-    ref_br   = np.radians(ref_beta)
-    color    = kw["ref_color"]
-    name     = kw["ref_choice"]
-    phi_arr  = tracking_angle_exact(r_arr, L, ref_D)
-
-    if mode == "phi":
-        y = np.degrees(phi_arr)
-        ht = "r = %{x:.1f} mm<br>φ = %{y:.3f}°<extra></extra>"
-        label = f"{name}<br>β={ref_beta:.2f}°  D={ref_D:.2f}mm"
-    elif mode == "alpha":
-        y = np.degrees(phi_arr - ref_br)
-        ht = "r = %{x:.1f} mm<br>α = %{y:.3f}°<extra></extra>"
-        label = f"{name}<br>β={ref_beta:.2f}°  D={ref_D:.2f}mm"
-    elif mode == "skating":
-        y = kw["MU"] * np.tan(phi_arr) * 100.0
-        ht = "r = %{x:.1f} mm<br>Fr/Fv = %{y:.3f}%<extra></extra>"
-        label = f"{name}<br>β={ref_beta:.2f}°  D={ref_D:.2f}mm"
-    elif mode == "distortion":
-        y = distortion_pct(r_arr, L, ref_D, ref_br, kw["V_MOD"], kw["omega_r"])
-        ht = "r = %{x:.1f} mm<br>HD2 = %{y:.3f}%<extra></extra>"
-        label = f"{name}<br>β={ref_beta:.2f}°  D={ref_D:.2f}mm"
-
-    fig.add_trace(go.Scatter(
-        x=r_arr, y=y, name=label,
-        line=dict(color=color, width=2.0, dash="dashdot"),
-        hovertemplate=ht,
-    ))
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # SIDEBAR
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -259,52 +117,36 @@ with st.sidebar:
     st.markdown("## 🎵 Bauer (1945)")
     st.markdown("---")
 
-    # ── Groove radii ─────────────────────────────────────────────────────────
-    st.markdown("### Record groove radii")
-    outer_choice = st.selectbox(
-        "Outer groove radius",
-        list(OUTER_PRESETS.keys()) + ["Custom"],
-        key="outer_preset",
-    )
-    if outer_choice == "Custom":
-        if "outer_custom" not in st.session_state:
-            st.session_state["outer_custom"] = 146.05
-        R_OUTER = st.number_input("Outer radius (mm)", 60.0, 200.0,
-                                  step=0.01, format="%.3f", key="outer_custom")
-    else:
-        R_OUTER = OUTER_PRESETS[outer_choice]
-
-    inner_choice = st.selectbox(
-        "Inner groove radius",
-        list(INNER_PRESETS.keys()) + ["Custom"],
-        key="inner_preset",
-    )
-    if inner_choice == "Custom":
-        if "inner_custom" not in st.session_state:
-            st.session_state["inner_custom"] = 60.325
-        R_INNER = st.number_input("Inner radius (mm)", 20.0, 100.0,
-                                  step=0.01, format="%.3f", key="inner_custom")
-    else:
-        R_INNER = INNER_PRESETS[inner_choice]
-
-    st.caption(f"r₁ = {R_INNER:.3f} mm  ·  r₂ = {R_OUTER:.3f} mm")
-    st.markdown("---")
-
-    # ── Tonearm ──────────────────────────────────────────────────────────────
     st.markdown("### Tonearm")
-    if "L" not in st.session_state:
-        st.session_state["L"] = 230.0
-    L = st.number_input("Effective length  l  (mm)", 150.0, 350.0,
-                        step=0.01, format="%.2f", key="L")
+    col_sl, col_nb = st.columns([3, 2])
+    with col_sl:
+        L_sl = st.slider("l (mm)", 150.0, 350.0,
+                         st.session_state.get("L", 230.0), 0.1,
+                         key="L_slider", label_visibility="visible")
+    with col_nb:
+        L = st.number_input("mm", 150.0, 350.0,
+                            value=L_sl, step=0.01, format="%.2f",
+                            key="L_num", label_visibility="visible")
+    if L != L_sl:
+        st.session_state["L"] = L
+    else:
+        st.session_state["L"] = L_sl
+        L = L_sl
 
     st.caption("Head offset angle β — used in tabs 2 & 4")
-    if "BETA_DEG" not in st.session_state:
-        st.session_state["BETA_DEG"] = 20.0
-    BETA_DEG = st.number_input("Offset angle  β  (°)", 0.0, 35.0,
-                               step=0.01, format="%.2f", key="BETA_DEG",
-                               help="Angle between arm centreline and cartridge axis")
+    col_sl, col_nb = st.columns([3, 2])
+    with col_sl:
+        beta_sl = st.slider("β (°)", 0.0, 35.0,
+                            st.session_state.get("BETA", 20.0), 0.01,
+                            key="beta_slider", label_visibility="visible",
+                            help="Angle between arm centreline and cartridge axis")
+    with col_nb:
+        BETA_DEG = st.number_input("β°", 0.0, 35.0,
+                                   value=beta_sl, step=0.01, format="%.2f",
+                                   key="beta_num", label_visibility="collapsed")
+    BETA_DEG = BETA_DEG if BETA_DEG != beta_sl else beta_sl
+    st.session_state["BETA"] = BETA_DEG
 
-    # ── Overhang curves ───────────────────────────────────────────────────────
     st.markdown("### Overhang curves  D (mm)")
     st.caption("Up to 4 curves — add or remove freely")
 
@@ -313,22 +155,21 @@ with st.sidebar:
 
     to_remove = None
     for idx, D_val in enumerate(st.session_state.overhangs):
-        col_n, col_x = st.columns([5, 1])
-        with col_n:
-            key = f"d_val_{idx}"
-            if key not in st.session_state:
-                st.session_state[key] = float(D_val)
-            new_val = st.number_input(
-                f"D{idx+1} (mm)", -60.0, 100.0,
-                step=0.01, format="%.2f", key=key,
-                label_visibility="visible",
+        col_s, col_n, col_x = st.columns([3, 2, 1])
+        with col_s:
+            d_sl = st.slider(
+                f"D{idx+1}", -60.0, 100.0, float(D_val), 0.1,
+                key=f"d_slider_{idx}", label_visibility="collapsed",
             )
-            st.session_state.overhangs[idx] = new_val
+        with col_n:
+            d_nb = st.number_input(
+                "mm", -60.0, 100.0, value=d_sl, step=0.01, format="%.2f",
+                key=f"d_num_{idx}", label_visibility="collapsed",
+            )
         with col_x:
-            st.markdown("<div style='margin-top:28px'>", unsafe_allow_html=True)
             if st.button("✕", key=f"rm_{idx}"):
                 to_remove = idx
-            st.markdown("</div>", unsafe_allow_html=True)
+        st.session_state.overhangs[idx] = d_nb if d_nb != d_sl else d_sl
 
     if to_remove is not None:
         st.session_state.overhangs.pop(to_remove)
@@ -349,50 +190,42 @@ with st.sidebar:
     st.info(f"Eq.22: D = {D_eq22:.3f} mm\n(β=0, optimal underhung, l={L:.2f} mm)")
 
     st.markdown("---")
-    st.markdown("### Reference alignment (optional)")
-    st.caption("Adds a reference curve to all tabs")
-    ref_choice = st.selectbox(
-        "Alignment standard",
-        ["— none —", "Löfgren A (IEC / Baerwald)", "Löfgren B", "Stevenson"],
-        key="ref_alignment",
-    )
-    show_ref = ref_choice != "— none —"
-    if show_ref:
-        ref_beta, ref_D, ref_r1, ref_r2 = solve_alignment(ref_choice, L, R_INNER, R_OUTER)
-        ref_color = {"Löfgren A (IEC / Baerwald)": "#f0c040",
-                     "Löfgren B":                  "#7ec8a0",
-                     "Stevenson":                  "#c07ef0"}[ref_choice]
-        st.success(
-            f"**{ref_choice}**\n\n"
-            f"β = {ref_beta:.2f}°  ·  D = {ref_D:.2f} mm\n\n"
-            f"Nulls:  {ref_r1:.1f} mm  &  {ref_r2:.1f} mm"
-        )
-
-    st.markdown("---")
     st.markdown("### Skating force (Tab 3)")
-    if "MU" not in st.session_state:
-        st.session_state["MU"] = 0.25
-    MU = st.number_input("Friction coefficient  µ", 0.10, 0.80,
-                         step=0.01, format="%.2f", key="MU",
-                         help="Bauer typical ≈ 0.25; soft vinyl / heavy stylus → higher")
+    col_sl, col_nb = st.columns([3, 2])
+    with col_sl:
+        mu_sl = st.slider("µ", 0.10, 0.80,
+                          st.session_state.get("MU", 0.25), 0.01,
+                          key="mu_slider", label_visibility="visible",
+                          help="Bauer typical ≈ 0.25")
+    with col_nb:
+        MU = st.number_input("µ val", 0.10, 0.80,
+                             value=mu_sl, step=0.01, format="%.2f",
+                             key="mu_num", label_visibility="collapsed")
+    MU = MU if MU != mu_sl else mu_sl
+    st.session_state["MU"] = MU
 
     st.markdown("---")
     st.markdown("### Distortion (Tab 4)")
-    if "V_MOD" not in st.session_state:
-        st.session_state["V_MOD"] = 70.0
-    V_MOD = st.number_input("Peak modulation velocity  ωA  (mm/s)", 20.0, 150.0,
-                            step=0.5, format="%.1f", key="V_MOD",
-                            help="Bauer ref ≈ 67 mm/s; commercial pressings often higher")
-    if "RPM" not in st.session_state:
-        st.session_state["RPM"] = 33.33
-    RPM = st.selectbox("Record speed (rpm)", [33.33, 45.0, 78.0], key="RPM")
+
+    col_sl, col_nb = st.columns([3, 2])
+    with col_sl:
+        vmod_sl = st.slider("ωA (mm/s)", 20.0, 150.0,
+                            st.session_state.get("VMOD", 70.0), 0.5,
+                            key="vmod_slider", label_visibility="visible",
+                            help="Peak groove modulation velocity")
+    with col_nb:
+        V_MOD = st.number_input("mm/s", 20.0, 150.0,
+                                value=vmod_sl, step=0.1, format="%.1f",
+                                key="vmod_num", label_visibility="collapsed")
+    V_MOD = V_MOD if V_MOD != vmod_sl else vmod_sl
+    st.session_state["VMOD"] = V_MOD
+
+    RPM = st.selectbox("Record speed (rpm)", [33.33, 45.0, 78.0], index=0)
 
     st.markdown("---")
     st.caption("Bauer, B.B. (1945). *Tracking Angle in Phonograph Pickups*. Electronics, March 1945.")
 
-# ── Build r_arr and OVERHANGS list ───────────────────────────────────────────
-
-r_arr = np.linspace(R_INNER, R_OUTER, N)
+# ── Build OVERHANGS list ──────────────────────────────────────────────────────
 
 OVERHANG_VALUES = st.session_state.overhangs
 OVERHANGS = [{"D": D, "label": make_label(D), "color": COLORS[i % len(COLORS)]}
@@ -408,17 +241,6 @@ OVERHANGS.append({
 
 beta_rad = np.radians(BETA_DEG)
 omega_r  = 2 * np.pi * RPM / 60.0
-
-# Reference alignment kwargs — passed to add_ref_trace in every tab
-if show_ref:
-    ref_kw = dict(show_ref=True, L=L, r_arr=r_arr,
-                  ref_D=ref_D, ref_beta=ref_beta,
-                  ref_color=ref_color, ref_choice=ref_choice,
-                  MU=MU, V_MOD=V_MOD, omega_r=omega_r)
-else:
-    ref_kw = dict(show_ref=False, L=L, r_arr=r_arr,
-                  ref_D=0, ref_beta=0, ref_color="#fff",
-                  ref_choice="", MU=MU, V_MOD=V_MOD, omega_r=omega_r)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # HEADER
@@ -458,7 +280,6 @@ with tab1:
                 hovertemplate="r = %{x:.1f} mm<br>φ = %{y:.3f}°<extra></extra>",
             ))
 
-        add_ref_trace(fig1, "phi", **ref_kw)
         fig1.update_layout(
             **LAYOUT_BASE,
             title=dict(text="Tracking angle φ vs groove radius  [Bauer Eq. 4, exact]",
@@ -572,7 +393,6 @@ with tab2:
                               line=dict(color=cfg["color"], width=1, dash="dot"),
                               opacity=0.6)
 
-    add_ref_trace(fig_err, "alpha", **ref_kw)
     fig_err.update_layout(
         **LAYOUT_BASE,
         title=dict(
@@ -641,7 +461,6 @@ with tab3:
             hovertemplate="r = %{x:.1f} mm<br>Fr/Fv = %{y:.3f} %<extra></extra>",
         ))
 
-    add_ref_trace(fig2, "skating", **ref_kw)
     fig2.update_layout(
         **LAYOUT_BASE,
         title=dict(
@@ -715,7 +534,6 @@ with tab4:
             fig3.add_vline(x=z, line=dict(color=cfg["color"], width=0.8, dash="dot"),
                            opacity=0.5)
 
-    add_ref_trace(fig3, "distortion", **ref_kw)
     fig3.update_layout(
         **LAYOUT_BASE,
         title=dict(
