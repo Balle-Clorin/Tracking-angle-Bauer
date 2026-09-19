@@ -94,7 +94,6 @@ LAYOUT_BASE = dict(
     font=dict(family="IBM Plex Mono, monospace", color="#8a919e", size=11),
     xaxis=dict(gridcolor="#22262e", zerolinecolor="#32373f", tickcolor="#8a919e"),
     yaxis=dict(gridcolor="#22262e", zerolinecolor="#32373f", tickcolor="#8a919e"),
-    margin=dict(l=60, r=30, t=50, b=50),
 )
 
 LEGEND_BASE = dict(
@@ -289,6 +288,7 @@ with tab1:
             yaxis_title="Tracking angle  φ  (degrees)",
             shapes=[vline(R_INNER), vline(R_OUTER), hline(0)],
             height=480,
+            margin=dict(l=60, r=30, t=50, b=50),
             legend=dict(**LEGEND_BASE, x=0.99, y=0.01,
                         xanchor="right", yanchor="bottom"),
         )
@@ -471,6 +471,7 @@ with tab3:
         yaxis_title=f"µ · tan(φ) × 100  (%  of VTF)   [µ = {MU:.2f}]",
         shapes=[vline(R_INNER), vline(R_OUTER), hline(0)],
         height=520,
+        margin=dict(l=60, r=30, t=50, b=50),
         legend=dict(**LEGEND_BASE, x=0.99, y=0.01,
                     xanchor="right", yanchor="bottom"),
     )
@@ -543,6 +544,7 @@ with tab4:
         yaxis_title="2nd harmonic distortion  (%)",
         shapes=[vline(R_INNER), vline(R_OUTER)],
         height=520,
+        margin=dict(l=60, r=30, t=50, b=50),
         legend=dict(**LEGEND_BASE, x=0.99, y=0.99,
                     xanchor="right", yanchor="top"),
     )
