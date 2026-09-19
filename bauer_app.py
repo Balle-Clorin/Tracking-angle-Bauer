@@ -262,7 +262,7 @@ with st.sidebar:
     st.caption("Up to 4 curves — add or remove freely")
 
     if "overhangs" not in st.session_state:
-        st.session_state.overhangs = [0.0, 17.8, 20.0]
+        st.session_state.overhangs = [17.8]
 
     to_remove = None
     for idx, D_val in enumerate(st.session_state.overhangs):
@@ -424,9 +424,10 @@ with tab1:
 
     # ── Fig 1(a) — Geometry diagram ──────────────────────────────────────────
     with col_geo:
-        # Solve the exact triangle O-P-stylus for the first user overhang curve
-        DIAG_D     = OVERHANGS[0]["D"]
-        DIAG_color = OVERHANGS[0]["color"]
+        # Use first non-eq22 curve for illustration
+        diag_cfg   = next((c for c in OVERHANGS if not c.get("eq22")), OVERHANGS[0])
+        DIAG_D     = diag_cfg["D"]
+        DIAG_color = diag_cfg["color"]
         r_diag     = (R_INNER + R_OUTER) / 2
         d_pivot    = L - DIAG_D
 
