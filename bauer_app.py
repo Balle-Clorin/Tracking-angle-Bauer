@@ -267,9 +267,10 @@ with st.sidebar:
         key="outer_preset",
     )
     if outer_choice == "Custom":
+        if "outer_custom" not in st.session_state:
+            st.session_state["outer_custom"] = 146.05
         R_OUTER = st.number_input("Outer radius (mm)", 60.0, 200.0,
-                                  step=0.01, format="%.3f", key="outer_custom",
-                                  value=st.session_state.get("outer_custom", 146.05))
+                                  step=0.01, format="%.3f", key="outer_custom")
     else:
         R_OUTER = OUTER_PRESETS[outer_choice]
 
@@ -279,9 +280,10 @@ with st.sidebar:
         key="inner_preset",
     )
     if inner_choice == "Custom":
+        if "inner_custom" not in st.session_state:
+            st.session_state["inner_custom"] = 60.325
         R_INNER = st.number_input("Inner radius (mm)", 20.0, 100.0,
-                                  step=0.01, format="%.3f", key="inner_custom",
-                                  value=st.session_state.get("inner_custom", 60.325))
+                                  step=0.01, format="%.3f", key="inner_custom")
     else:
         R_INNER = INNER_PRESETS[inner_choice]
 
@@ -290,14 +292,16 @@ with st.sidebar:
 
     # ── Tonearm ──────────────────────────────────────────────────────────────
     st.markdown("### Tonearm")
+    if "L" not in st.session_state:
+        st.session_state["L"] = 230.0
     L = st.number_input("Effective length  l  (mm)", 150.0, 350.0,
-                        step=0.01, format="%.2f", key="L",
-                        value=st.session_state.get("L", 230.0))
+                        step=0.01, format="%.2f", key="L")
 
     st.caption("Head offset angle β — used in tabs 2 & 4")
+    if "BETA_DEG" not in st.session_state:
+        st.session_state["BETA_DEG"] = 20.0
     BETA_DEG = st.number_input("Offset angle  β  (°)", 0.0, 35.0,
                                step=0.01, format="%.2f", key="BETA_DEG",
-                               value=st.session_state.get("BETA_DEG", 20.0),
                                help="Angle between arm centreline and cartridge axis")
 
     # ── Overhang curves ───────────────────────────────────────────────────────
@@ -311,10 +315,13 @@ with st.sidebar:
     for idx, D_val in enumerate(st.session_state.overhangs):
         col_n, col_x = st.columns([5, 1])
         with col_n:
+            key = f"d_val_{idx}"
+            if key not in st.session_state:
+                st.session_state[key] = float(D_val)
             new_val = st.number_input(
                 f"D{idx+1} (mm)", -60.0, 100.0,
-                value=float(D_val), step=0.01, format="%.2f",
-                key=f"d_val_{idx}", label_visibility="visible",
+                step=0.01, format="%.2f", key=key,
+                label_visibility="visible",
             )
             st.session_state.overhangs[idx] = new_val
         with col_x:
@@ -363,17 +370,21 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("### Skating force (Tab 3)")
+    if "MU" not in st.session_state:
+        st.session_state["MU"] = 0.25
     MU = st.number_input("Friction coefficient  µ", 0.10, 0.80,
                          step=0.01, format="%.2f", key="MU",
-                         value=st.session_state.get("MU", 0.25),
                          help="Bauer typical ≈ 0.25; soft vinyl / heavy stylus → higher")
 
     st.markdown("---")
     st.markdown("### Distortion (Tab 4)")
+    if "V_MOD" not in st.session_state:
+        st.session_state["V_MOD"] = 70.0
     V_MOD = st.number_input("Peak modulation velocity  ωA  (mm/s)", 20.0, 150.0,
                             step=0.5, format="%.1f", key="V_MOD",
-                            value=st.session_state.get("V_MOD", 70.0),
                             help="Bauer ref ≈ 67 mm/s; commercial pressings often higher")
+    if "RPM" not in st.session_state:
+        st.session_state["RPM"] = 33.33
     RPM = st.selectbox("Record speed (rpm)", [33.33, 45.0, 78.0], key="RPM")
 
     st.markdown("---")
