@@ -17,6 +17,7 @@ import numpy as np
 import streamlit as st
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from scipy.optimize import fsolve
 
 # ── Page config ──────────────────────────────────────────────────────────────
 
@@ -147,35 +148,56 @@ def solve_alignment(name, l, r_inner, r_outer):
     """
     Return (beta_deg, D_mm, r1_null, r2_null) for a named alignment.
 
-    Löfgren A:  Minimises ∫ α²·r^w dr (numerically) where w≈−0.826 reproduces
-                the Baerwald/Löfgren A β values published in standard references.
-                β and D are solved simultaneously; null radii follow from
-                r/(2l) + D/r = β  (Bauer Eq. 5 at the null).
+    All three alignments place two null radii where tracking error α = 0.
+    Given null radii r1, r2:
+        D    = r1 · r2 / (2l)
+        β    = r1/(2l) + D/r1   [Bauer Eq.5 at the null]
 
-    Löfgren B:  Equal endpoint peaks |α(ri)| = |α(ro)|, ignoring valley.
-                r1 = (ri²·√(ri·ro))^(1/3),  r2 = (ro²·√(ri·ro))^(1/3)
+    Löfgren A (Baerwald):  Three equal absolute error peaks at ri, valley, ro.
+        Conditions: α(ri) = α(ro)  AND  α(ri) = −α(r_valley)
+        where r_valley = √(2lD) is the error minimum. Solved via fsolve.
 
-    Stevenson:  Zero tracking error at outer groove (r2 = ro).
-                r1 = √(2·ri²·ro²/(ri²+ro²))
+    Löfgren B:  Equal endpoint peaks only |α(ri)| = |α(ro)|.
+        Closed form: r1 = (ri²·√(ri·ro))^(1/3),  r2 = (ro²·√(ri·ro))^(1/3)
 
-    Reference: Löfgren (1938); Baerwald (1941 JSMPTE); Stevenson (1966).
+    Stevenson:  Zero error at outer groove (r2 = ro).
+        Closed form: r1 = √(2·ri²·ro²/(ri²+ro²))
+
+    Reference: Löfgren (1938); Baerwald (1941 JSMPTE vol.37); Stevenson (1966).
     """
-    from scipy.optimize import minimize
     ri, ro = r_inner, r_outer
 
     if name == "Löfgren A (IEC / Baerwald)":
-        r_arr = np.linspace(ri, ro, 2000)
-        def obj(params):
+        # Analytical warm start from unweighted ∫α²dr minimisation:
+        # ∂/∂β=0:  β*(ro-ri) = (ro²-ri²)/(4l) + D*ln(ro/ri)
+        # ∂/∂D=0:  β*ln(ro/ri) = (ro-ri)/(2l) + D*(1/ri-1/ro)
+        _A  = (ro**2 - ri**2) / (4.0*l*(ro - ri))
+        _B  = np.log(ro/ri) / (ro - ri)
+        _C  = (ro - ri) / (2.0*l)
+        _E  = 1.0/ri - 1.0/ro
+        _F  = np.log(ro/ri)
+        D0    = (_C - _A*_F) / (_B*_F - _E)
+        beta0 = _A + D0*_B
+
+        def equations(params):
             beta, D = params
-            alpha = r_arr / (2*l) + D / r_arr - beta
-            return np.trapezoid(alpha**2 * r_arr**(-0.8259), r_arr)
-        beta0 = (ri + ro) / (4*l) + 15.0 / ri
-        res   = minimize(obj, [beta0, ri*ro/(2*l)*0.85], method='Nelder-Mead',
-                         options={'xatol':1e-10, 'fatol':1e-14, 'maxiter':50000})
-        beta_r, D_mm = res.x
+            if D <= 0.0:
+                return [1e9, 1e9]
+            r_v  = np.sqrt(2.0 * l * D)
+            a_ri = ri/(2*l) + D/ri - beta
+            a_ro = ro/(2*l) + D/ro - beta
+            a_v  = r_v/(2*l) + D/r_v - beta
+            return [a_ri - a_ro,   # equal endpoint peaks
+                    a_ri + a_v]    # outer peak = −valley
+
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            sol = fsolve(equations, [beta0, D0], full_output=False)
+        beta_r, D_mm = float(sol[0]), float(sol[1])
         beta_deg = np.degrees(beta_r)
         lbeta    = l * beta_r
-        disc     = lbeta**2 - 2.0*l*D_mm
+        disc     = lbeta**2 - 2.0 * l * D_mm
         r1_null  = lbeta - np.sqrt(max(disc, 0.0))
         r2_null  = lbeta + np.sqrt(max(disc, 0.0))
 
@@ -183,14 +205,14 @@ def solve_alignment(name, l, r_inner, r_outer):
         gm       = np.sqrt(ri * ro)
         r1_null  = (ri**2 * gm) ** (1.0/3.0)
         r2_null  = (ro**2 * gm) ** (1.0/3.0)
-        D_mm     = r1_null * r2_null / (2.0*l)
-        beta_deg = np.degrees(r1_null/(2.0*l) + D_mm/r1_null)
+        D_mm     = r1_null * r2_null / (2.0 * l)
+        beta_deg = np.degrees(r1_null / (2.0*l) + D_mm / r1_null)
 
     elif name == "Stevenson":
         r2_null  = ro
-        r1_null  = np.sqrt(2.0*ri**2*ro**2 / (ri**2+ro**2))
-        D_mm     = r1_null * r2_null / (2.0*l)
-        beta_deg = np.degrees(r1_null/(2.0*l) + D_mm/r1_null)
+        r1_null  = np.sqrt(2.0 * ri**2 * ro**2 / (ri**2 + ro**2))
+        D_mm     = r1_null * r2_null / (2.0 * l)
+        beta_deg = np.degrees(r1_null / (2.0*l) + D_mm / r1_null)
 
     return beta_deg, D_mm, r1_null, r2_null
 
