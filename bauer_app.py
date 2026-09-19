@@ -254,8 +254,9 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-tab1, tab2, tab3 = st.tabs([
+tab1, tab2, tab3, tab4 = st.tabs([
     "📐  Tracking Angle  φ",
+    "🎯  Tracking Error  α",
     "⚡  Skating Force  Fr",
     "📊  Distortion  HD2",
 ])
@@ -325,10 +326,126 @@ with tab1:
         st.markdown(rows_html, unsafe_allow_html=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# TAB 2 — Skating force
+# TAB 2 — Tracking error  α = φ − β
 # ═══════════════════════════════════════════════════════════════════════════════
 
 with tab2:
+
+    # ── Y-axis range controls ─────────────────────────────────────────────────
+    # Compute the full data range first so defaults are sensible
+    all_alpha = []
+    for cfg in OVERHANGS:
+        beta_use = 0.0 if cfg.get("eq22") else beta_rad
+        all_alpha.append(np.degrees(tracking_angle_exact(r_arr, L, cfg["D"]) - beta_use))
+    all_alpha = np.concatenate(all_alpha)
+    data_ymin = float(np.floor(all_alpha.min()))
+    data_ymax = float(np.ceil(all_alpha.max()))
+
+    ctl_l, ctl_r = st.columns([1, 1])
+    with ctl_l:
+        y_lo = st.number_input(
+            "Y axis  min  (°)", value=data_ymin, step=0.5, format="%.1f",
+            key="err_ymin",
+            help="Lower bound of tracking-error axis — type to zoom in"
+        )
+    with ctl_r:
+        y_hi = st.number_input(
+            "Y axis  max  (°)", value=data_ymax, step=0.5, format="%.1f",
+            key="err_ymax",
+            help="Upper bound of tracking-error axis — type to zoom in"
+        )
+    if y_lo >= y_hi:
+        st.warning("Y min must be less than Y max — resetting to data range.")
+        y_lo, y_hi = data_ymin, data_ymax
+
+    # ── Plot ─────────────────────────────────────────────────────────────────
+    fig_err = go.Figure()
+    fig_err.add_hline(y=0, line=dict(color="#32373f", width=1, dash="dot"))
+
+    for cfg in OVERHANGS:
+        D = cfg["D"]
+        phi_arr   = tracking_angle_exact(r_arr, L, D)
+        beta_use  = 0.0 if cfg.get("eq22") else beta_rad
+        alpha_arr = np.degrees(phi_arr - beta_use)
+        nulls     = find_nulls(phi_arr - beta_use, r_arr)
+
+        if cfg.get("eq22"):
+            label = f"D = {D:.2f} mm,  β = 0°  (Eq.22 optimal underhung)"
+        else:
+            sign  = "+" if D > 0 else ""
+            label = f"D = {sign}{D:.2f} mm,  β = {BETA_DEG:.2f}°"
+
+        hover = "r = %{x:.1f} mm<br>α = %{y:.3f}°"
+        if nulls:
+            hover += "  |  nulls: " + ", ".join(f"{z:.1f} mm" for z in nulls)
+        hover += "<extra></extra>"
+
+        fig_err.add_trace(go.Scatter(
+            x=r_arr, y=alpha_arr, name=label,
+            line=dict(color=cfg["color"],
+                      width=2.2 if cfg.get("eq22") else 1.8,
+                      dash="dash" if cfg.get("eq22") else "solid"),
+            hovertemplate=hover,
+        ))
+
+        for z in nulls:
+            fig_err.add_vline(x=z,
+                              line=dict(color=cfg["color"], width=1, dash="dot"),
+                              opacity=0.6)
+
+    fig_err.update_layout(
+        **LAYOUT_BASE,
+        title=dict(
+            text=f"Tracking error  α = φ − β   [β = {BETA_DEG:.2f}°,  Bauer Eq. 4 exact]",
+            font=dict(color="#dce1e9", size=12)),
+        xaxis_title="Groove radius  r  (mm)",
+        yaxis_title="Tracking error  α  (degrees)",
+        yaxis_range=[y_lo, y_hi],
+        shapes=[vline(R_INNER), vline(R_OUTER)],
+        height=520,
+        legend=dict(**LEGEND_BASE, x=0.99, y=0.99,
+                    xanchor="right", yanchor="top"),
+    )
+    fig_err.update_xaxes(range=[R_INNER - 3, R_OUTER + 3])
+    st.plotly_chart(fig_err, use_container_width=True)
+
+    # Null-radius summary
+    st.markdown("#### Null radii  (α = 0, perfect tangency)")
+    null_cols = st.columns(len(OVERHANGS))
+    for col, cfg in zip(null_cols, OVERHANGS):
+        D        = cfg["D"]
+        beta_use = 0.0 if cfg.get("eq22") else beta_rad
+        alpha_arr = tracking_angle_exact(r_arr, L, D) - beta_use
+        nulls    = find_nulls(alpha_arr, r_arr)
+        color    = cfg["color"]
+        clabel   = cfg["label"] if cfg.get("eq22") else \
+                   (f"D = {'+' if D>0 else ''}{D:.2f} mm,  β = {BETA_DEG:.2f}°"
+                    if D != 0 else f"D = 0 mm,  β = {BETA_DEG:.2f}°")
+        null_rows = "".join(f"<div class='value null-row'>{z:.1f} mm</div>" for z in nulls)
+        no_null   = "<div class='value' style='color:#c96e85'>none in range</div>" \
+                    if not nulls else ""
+        with col:
+            st.markdown(
+                f"<div class='metric-box'>"
+                f"<div style='color:{color};font-weight:bold'>{clabel}</div>"
+                f"<div class='label'>Null radii</div>"
+                + null_rows + no_null +
+                "</div>",
+                unsafe_allow_html=True
+            )
+
+    st.caption(
+        f"α = φ(r) − β   where φ is the exact Bauer Eq.(4) tracking angle "
+        f"and β = {BETA_DEG:.2f}° is the arm head offset angle.  "
+        f"Dotted vertical lines mark the null radii where α = 0 "
+        f"(stylus tangent to groove)."
+    )
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TAB 3 — Skating force
+# ═══════════════════════════════════════════════════════════════════════════════
+
+with tab3:
     fig2 = go.Figure()
     for cfg in OVERHANGS:
         phi_arr = tracking_angle_exact(r_arr, L, cfg["D"])
@@ -364,10 +481,10 @@ with tab2:
     )
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# TAB 3 — 2nd-order distortion
+# TAB 4 — 2nd-order distortion
 # ═══════════════════════════════════════════════════════════════════════════════
 
-with tab3:
+with tab4:
     fig3 = go.Figure()
 
     # 2.2% Bauer reference line
