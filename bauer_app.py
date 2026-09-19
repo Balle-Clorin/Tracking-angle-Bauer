@@ -246,13 +246,13 @@ with st.sidebar:
     # ── Tonearm ──────────────────────────────────────────────────────────────
     st.markdown("### Tonearm")
     if "L" not in st.session_state:
-        st.session_state["L"] = 230.0
+        st.session_state["L"] = 233.15
     L = st.number_input("Effective length  l  (mm)", 150.0, 350.0,
                         step=0.01, format="%.2f", key="L")
 
     st.caption("Head offset angle β — used in tabs 2 & 4")
     if "BETA_DEG" not in st.session_state:
-        st.session_state["BETA_DEG"] = 20.0
+        st.session_state["BETA_DEG"] = 23.63
     BETA_DEG = st.number_input("Offset angle  β  (°)", 0.0, 35.0,
                                step=0.01, format="%.2f", key="BETA_DEG",
                                help="Angle between arm centreline and cartridge axis")
@@ -262,7 +262,7 @@ with st.sidebar:
     st.caption("Up to 4 curves — add or remove freely")
 
     if "overhangs" not in st.session_state:
-        st.session_state.overhangs = [0.0, 15.0, 20.0]
+        st.session_state.overhangs = [0.0, 17.8, 20.0]
 
     to_remove = None
     for idx, D_val in enumerate(st.session_state.overhangs):
