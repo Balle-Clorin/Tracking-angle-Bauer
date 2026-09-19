@@ -94,9 +94,12 @@ LAYOUT_BASE = dict(
     font=dict(family="IBM Plex Mono, monospace", color="#8a919e", size=11),
     xaxis=dict(gridcolor="#22262e", zerolinecolor="#32373f", tickcolor="#8a919e"),
     yaxis=dict(gridcolor="#22262e", zerolinecolor="#32373f", tickcolor="#8a919e"),
-    legend=dict(bgcolor="#22262e", bordercolor="#32373f", borderwidth=1,
-                font=dict(color="#dce1e9", size=10)),
     margin=dict(l=60, r=30, t=50, b=50),
+)
+
+LEGEND_BASE = dict(
+    bgcolor="#22262e", bordercolor="#32373f", borderwidth=1,
+    font=dict(color="#dce1e9", size=10),
 )
 
 def vline(x, color="#32373f"):
@@ -235,7 +238,7 @@ with tab1:
             yaxis_title="Tracking angle  φ  (degrees)",
             shapes=[vline(R_INNER), vline(R_OUTER), hline(0)],
             height=480,
-            legend=dict(**LAYOUT_BASE["legend"], x=0.01, y=0.01,
+            legend=dict(**LEGEND_BASE, x=0.01, y=0.01,
                         xanchor="left", yanchor="bottom"),
         )
         fig1.update_xaxes(range=[R_INNER - 3, R_OUTER + 3])
@@ -298,7 +301,7 @@ with tab2:
         yaxis_title=f"µ · tan(φ) × 100  (%  of VTF)   [µ = {MU:.2f}]",
         shapes=[vline(R_INNER), vline(R_OUTER), hline(0)],
         height=520,
-        legend=dict(**LAYOUT_BASE["legend"], x=0.99, y=0.01,
+        legend=dict(**LEGEND_BASE, x=0.99, y=0.01,
                     xanchor="right", yanchor="bottom"),
     )
     fig2.update_xaxes(range=[R_INNER - 3, R_OUTER + 3])
@@ -370,7 +373,7 @@ with tab3:
         yaxis_title="2nd harmonic distortion  (%)",
         shapes=[vline(R_INNER), vline(R_OUTER)],
         height=520,
-        legend=dict(**LAYOUT_BASE["legend"], x=0.99, y=0.99,
+        legend=dict(**LEGEND_BASE, x=0.99, y=0.99,
                     xanchor="right", yanchor="top"),
     )
     fig3.update_xaxes(range=[R_INNER - 3, R_OUTER + 3])
