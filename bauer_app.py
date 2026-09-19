@@ -561,17 +561,18 @@ with tab1:
         all_y = [0, py, needle_geo[1], -abs(DIAG_D)-10]
         pad = 35
         fig_geo.update_layout(
-            **LAYOUT_BASE,
+            paper_bgcolor="#1a1d23", plot_bgcolor="#12151a",
+            font=dict(family="IBM Plex Mono, monospace", color="#8a919e", size=11),
             title=dict(
                 text=f"Fig. 1(a) — Pivot / record / needle geometry<br>"
                      f"<sup>D={DIAG_D:+.1f} mm · r={r_diag:.0f} mm · l={L:.0f} mm</sup>",
                 font=dict(color="#dce1e9", size=11)),
-            xaxis=dict(**LAYOUT_BASE["xaxis"],
-                       title="mm",
+            xaxis=dict(title="mm", gridcolor="#22262e", zerolinecolor="#32373f",
+                       tickcolor="#8a919e",
                        range=[min(all_x)-pad, max(all_x)+pad],
                        scaleanchor="y", scaleratio=1),
-            yaxis=dict(**LAYOUT_BASE["yaxis"],
-                       title="mm",
+            yaxis=dict(title="mm", gridcolor="#22262e", zerolinecolor="#32373f",
+                       tickcolor="#8a919e",
                        range=[min(all_y)-pad, max(all_y)+pad]),
             height=480,
             margin=dict(l=50, r=10, t=70, b=50),
