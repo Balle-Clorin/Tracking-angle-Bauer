@@ -238,8 +238,8 @@ with tab1:
             yaxis_title="Tracking angle  φ  (degrees)",
             shapes=[vline(R_INNER), vline(R_OUTER), hline(0)],
             height=480,
-            legend=dict(**LEGEND_BASE, x=0.01, y=0.01,
-                        xanchor="left", yanchor="bottom"),
+            legend=dict(**LEGEND_BASE, x=0.99, y=0.01,
+                        xanchor="right", yanchor="bottom"),
         )
         fig1.update_xaxes(range=[R_INNER - 3, R_OUTER + 3])
         st.plotly_chart(fig1, use_container_width=True)
