@@ -134,6 +134,20 @@ with st.sidebar:
         st.session_state["L"] = L_sl
         L = L_sl
 
+    st.caption("Head offset angle β — used in tabs 2 & 4")
+    col_sl, col_nb = st.columns([3, 2])
+    with col_sl:
+        beta_sl = st.slider("β (°)", 0.0, 35.0,
+                            st.session_state.get("BETA", 20.0), 0.01,
+                            key="beta_slider", label_visibility="visible",
+                            help="Angle between arm centreline and cartridge axis")
+    with col_nb:
+        BETA_DEG = st.number_input("β°", 0.0, 35.0,
+                                   value=beta_sl, step=0.01, format="%.2f",
+                                   key="beta_num", label_visibility="collapsed")
+    BETA_DEG = BETA_DEG if BETA_DEG != beta_sl else beta_sl
+    st.session_state["BETA"] = BETA_DEG
+
     st.markdown("### Overhang curves  D (mm)")
     st.caption("Up to 4 curves — add or remove freely")
 
@@ -156,7 +170,6 @@ with st.sidebar:
         with col_x:
             if st.button("✕", key=f"rm_{idx}"):
                 to_remove = idx
-        # number input takes precedence if it differs from slider
         st.session_state.overhangs[idx] = d_nb if d_nb != d_sl else d_sl
 
     if to_remove is not None:
@@ -178,7 +191,7 @@ with st.sidebar:
     st.info(f"Eq.22: D = {D_eq22:.3f} mm\n(β=0, optimal underhung, l={L:.2f} mm)")
 
     st.markdown("---")
-    st.markdown("### Skating force (Tab 2)")
+    st.markdown("### Skating force (Tab 3)")
     col_sl, col_nb = st.columns([3, 2])
     with col_sl:
         mu_sl = st.slider("µ", 0.10, 0.80,
@@ -193,20 +206,7 @@ with st.sidebar:
     st.session_state["MU"] = MU
 
     st.markdown("---")
-    st.markdown("### Distortion (Tab 3)")
-
-    col_sl, col_nb = st.columns([3, 2])
-    with col_sl:
-        beta_sl = st.slider("β (°)", 0.0, 35.0,
-                            st.session_state.get("BETA", 20.0), 0.01,
-                            key="beta_slider", label_visibility="visible",
-                            help="Offset angle between arm centreline and cartridge axis")
-    with col_nb:
-        BETA_DEG = st.number_input("β°", 0.0, 35.0,
-                                   value=beta_sl, step=0.01, format="%.2f",
-                                   key="beta_num", label_visibility="collapsed")
-    BETA_DEG = BETA_DEG if BETA_DEG != beta_sl else beta_sl
-    st.session_state["BETA"] = BETA_DEG
+    st.markdown("### Distortion (Tab 4)")
 
     col_sl, col_nb = st.columns([3, 2])
     with col_sl:
@@ -403,8 +403,11 @@ with tab2:
         yaxis_range=[y_lo, y_hi],
         shapes=[vline(R_INNER), vline(R_OUTER)],
         height=520,
-        legend=dict(**LEGEND_BASE, x=0.99, y=0.99,
-                    xanchor="right", yanchor="top"),
+        margin=dict(l=60, r=30, t=50, b=120),
+        legend=dict(**LEGEND_BASE,
+                    orientation="h",
+                    x=0.0, y=-0.22,
+                    xanchor="left", yanchor="top"),
     )
     fig_err.update_xaxes(range=[R_INNER - 3, R_OUTER + 3])
     st.plotly_chart(fig_err, use_container_width=True)
