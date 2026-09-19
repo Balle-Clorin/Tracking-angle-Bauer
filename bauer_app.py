@@ -17,7 +17,6 @@ import numpy as np
 import streamlit as st
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from scipy.optimize import fsolve
 
 # ── Page config ──────────────────────────────────────────────────────────────
 
@@ -98,124 +97,6 @@ def make_label(D):
         return "D = 0 mm"
     return f"D = {'+' if D > 0 else ''}{D:.2f} mm"
 
-# ── Classic alignment solvers ─────────────────────────────────────────────────
-#
-# All three alignments place two null radii (r1_null, r2_null) where tracking
-# error α = 0.  Given those two radii and effective length l, the (β, D) pair
-# follows from Bauer Eqs (17)–(20):
-#
-#   φ1 = r1/(2l) + D/r1   [rad, small-angle Eq.5 — accurate enough for β/D solve]
-#   φ2 = r2/(2l) + D/r2
-#   β  = (φ1·r2² − φ2·r1²) / (r2² − r1²)   [rad]  Eq.(20) rearranged
-#   D  = (β − φ1) * ... solved from equal-slope condition
-#
-# We use the exact Eq.(4) iteratively: given null radii, solve for D so that
-# φ(r1_null) = φ(r2_null) = β, by minimising the residual with scipy or a
-# simple analytical Löfgren formula.
-#
-# Analytical closed-form (Löfgren / Baerwald — exact for the small-angle approx):
-#   D = (r1_null² + r2_null²) / (2*l) * correction   — we use the exact version
-#   β_rad = r1_null/(2l) + D/r1_null  (evaluated at null, where φ = β)
-#
-# Null radii by alignment standard (IEC 60098, Löfgren, Stevenson):
-
-ALIGNMENTS = {
-    "Löfgren A (IEC / Baerwald)": {
-        # Minimises RMS distortion — nulls at Baerwald radii
-        # r_null = sqrt( (r_inner² + r_outer²) / 2 ) and geometric mean variant
-        # Standard IEC 60098 inner=60.325 mm, outer=146.05 mm for 12" LP
-        # Null radii: Löfgren A formula
-        "r1_null_frac": lambda ri, ro: np.sqrt((ri**2 + ro**2 - np.sqrt((ri**2 + ro**2)**2 - (4/3)*ri**2*ro**2)) / (2/3 * 1)),
-        "description": "Minimises RMS tracking error — standard IEC alignment",
-        "color": "#f0c040",
-        "dash": "dashdot",
-    },
-    "Löfgren B": {
-        # Minimises peak tracking error — equal absolute peaks at 3 points
-        "description": "Minimises peak tracking error (min-max / Chebyshev)",
-        "color": "#7ec8a0",
-        "dash": "dashdot",
-    },
-    "Stevenson": {
-        # One null at inner groove, peak at outer = 0 (no error at outer groove)
-        "description": "Zero tracking error at outer groove — reduces end-of-side distortion",
-        "color": "#c07ef0",
-        "dash": "dashdot",
-    },
-}
-
-def solve_alignment(name, l, r_inner, r_outer):
-    """
-    Return (beta_deg, D_mm, r1_null, r2_null) for a named alignment.
-
-    All three alignments place two null radii where tracking error α = 0.
-    Given null radii r1, r2:
-        D    = r1 · r2 / (2l)
-        β    = r1/(2l) + D/r1   [Bauer Eq.5 at the null]
-
-    Löfgren A (Baerwald):  Three equal absolute error peaks at ri, valley, ro.
-        Conditions: α(ri) = α(ro)  AND  α(ri) = −α(r_valley)
-        where r_valley = √(2lD) is the error minimum. Solved via fsolve.
-
-    Löfgren B:  Equal endpoint peaks only |α(ri)| = |α(ro)|.
-        Closed form: r1 = (ri²·√(ri·ro))^(1/3),  r2 = (ro²·√(ri·ro))^(1/3)
-
-    Stevenson:  Zero error at outer groove (r2 = ro).
-        Closed form: r1 = √(2·ri²·ro²/(ri²+ro²))
-
-    Reference: Löfgren (1938); Baerwald (1941 JSMPTE vol.37); Stevenson (1966).
-    """
-    ri, ro = r_inner, r_outer
-
-    if name == "Löfgren A (IEC / Baerwald)":
-        # Analytical warm start from unweighted ∫α²dr minimisation:
-        # ∂/∂β=0:  β*(ro-ri) = (ro²-ri²)/(4l) + D*ln(ro/ri)
-        # ∂/∂D=0:  β*ln(ro/ri) = (ro-ri)/(2l) + D*(1/ri-1/ro)
-        _A  = (ro**2 - ri**2) / (4.0*l*(ro - ri))
-        _B  = np.log(ro/ri) / (ro - ri)
-        _C  = (ro - ri) / (2.0*l)
-        _E  = 1.0/ri - 1.0/ro
-        _F  = np.log(ro/ri)
-        D0    = (_C - _A*_F) / (_B*_F - _E)
-        beta0 = _A + D0*_B
-
-        def equations(params):
-            beta, D = params
-            if D <= 0.0:
-                return [1e9, 1e9]
-            r_v  = np.sqrt(2.0 * l * D)
-            a_ri = ri/(2*l) + D/ri - beta
-            a_ro = ro/(2*l) + D/ro - beta
-            a_v  = r_v/(2*l) + D/r_v - beta
-            return [a_ri - a_ro,   # equal endpoint peaks
-                    a_ri + a_v]    # outer peak = −valley
-
-        import warnings
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")
-            sol = fsolve(equations, [beta0, D0], full_output=False)
-        beta_r, D_mm = float(sol[0]), float(sol[1])
-        beta_deg = np.degrees(beta_r)
-        lbeta    = l * beta_r
-        disc     = lbeta**2 - 2.0 * l * D_mm
-        r1_null  = lbeta - np.sqrt(max(disc, 0.0))
-        r2_null  = lbeta + np.sqrt(max(disc, 0.0))
-
-    elif name == "Löfgren B":
-        gm       = np.sqrt(ri * ro)
-        r1_null  = (ri**2 * gm) ** (1.0/3.0)
-        r2_null  = (ro**2 * gm) ** (1.0/3.0)
-        D_mm     = r1_null * r2_null / (2.0 * l)
-        beta_deg = np.degrees(r1_null / (2.0*l) + D_mm / r1_null)
-
-    elif name == "Stevenson":
-        r2_null  = ro
-        r1_null  = np.sqrt(2.0 * ri**2 * ro**2 / (ri**2 + ro**2))
-        D_mm     = r1_null * r2_null / (2.0 * l)
-        beta_deg = np.degrees(r1_null / (2.0*l) + D_mm / r1_null)
-
-    return beta_deg, D_mm, r1_null, r2_null
-
 # ── Plotly theme helper ───────────────────────────────────────────────────────
 
 LAYOUT_BASE = dict(
@@ -238,49 +119,6 @@ def vline(x, color="#32373f"):
 def hline(y, color="#32373f"):
     return dict(type="line", xref="paper", x0=0, x1=1, y0=y, y1=y,
                 line=dict(color=color, width=0.8, dash="dot"))
-
-def add_ref_trace(fig, mode, **kw):
-    """
-    Add the selected reference alignment curve to a figure.
-    mode: 'phi'   → plot tracking angle φ in degrees
-          'alpha' → plot tracking error α = φ − β_ref in degrees
-          'skating' → plot µ·tan(φ)×100 %
-          'distortion' → plot Bauer Eq.16 HD2 %
-    kw: L, MU, V_MOD, omega_r, ref_beta, ref_D, ref_color, ref_choice, r_arr
-    """
-    if not kw.get("show_ref"):
-        return
-    L        = kw["L"]
-    r_arr    = kw["r_arr"]
-    ref_D    = kw["ref_D"]
-    ref_beta = kw["ref_beta"]   # degrees
-    ref_br   = np.radians(ref_beta)
-    color    = kw["ref_color"]
-    name     = kw["ref_choice"]
-    phi_arr  = tracking_angle_exact(r_arr, L, ref_D)
-
-    if mode == "phi":
-        y = np.degrees(phi_arr)
-        ht = "r = %{x:.1f} mm<br>φ = %{y:.3f}°<extra></extra>"
-        label = f"{name}<br>β={ref_beta:.2f}°  D={ref_D:.2f}mm"
-    elif mode == "alpha":
-        y = np.degrees(phi_arr - ref_br)
-        ht = "r = %{x:.1f} mm<br>α = %{y:.3f}°<extra></extra>"
-        label = f"{name}<br>β={ref_beta:.2f}°  D={ref_D:.2f}mm"
-    elif mode == "skating":
-        y = kw["MU"] * np.tan(phi_arr) * 100.0
-        ht = "r = %{x:.1f} mm<br>Fr/Fv = %{y:.3f}%<extra></extra>"
-        label = f"{name}<br>β={ref_beta:.2f}°  D={ref_D:.2f}mm"
-    elif mode == "distortion":
-        y = distortion_pct(r_arr, L, ref_D, ref_br, kw["V_MOD"], kw["omega_r"])
-        ht = "r = %{x:.1f} mm<br>HD2 = %{y:.3f}%<extra></extra>"
-        label = f"{name}<br>β={ref_beta:.2f}°  D={ref_D:.2f}mm"
-
-    fig.add_trace(go.Scatter(
-        x=r_arr, y=y, name=label,
-        line=dict(color=color, width=2.0, dash="dashdot"),
-        hovertemplate=ht,
-    ))
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # SIDEBAR
@@ -380,26 +218,6 @@ with st.sidebar:
     st.info(f"Eq.22: D = {D_eq22:.3f} mm\n(β=0, optimal underhung, l={L:.2f} mm)")
 
     st.markdown("---")
-    st.markdown("### Reference alignment (optional)")
-    st.caption("Adds a reference curve to all tabs")
-    ref_choice = st.selectbox(
-        "Alignment standard",
-        ["— none —", "Löfgren A (IEC / Baerwald)", "Löfgren B", "Stevenson"],
-        key="ref_alignment",
-    )
-    show_ref = ref_choice != "— none —"
-    if show_ref:
-        ref_beta, ref_D, ref_r1, ref_r2 = solve_alignment(ref_choice, L, R_INNER, R_OUTER)
-        ref_color = {"Löfgren A (IEC / Baerwald)": "#f0c040",
-                     "Löfgren B":                  "#7ec8a0",
-                     "Stevenson":                  "#c07ef0"}[ref_choice]
-        st.success(
-            f"**{ref_choice}**\n\n"
-            f"β = {ref_beta:.2f}°  ·  D = {ref_D:.2f} mm\n\n"
-            f"Nulls:  {ref_r1:.1f} mm  &  {ref_r2:.1f} mm"
-        )
-
-    st.markdown("---")
     st.markdown("### Skating force (Tab 3)")
     if "MU" not in st.session_state:
         st.session_state["MU"] = 0.25
@@ -440,17 +258,6 @@ OVERHANGS.append({
 beta_rad = np.radians(BETA_DEG)
 omega_r  = 2 * np.pi * RPM / 60.0
 
-# Reference alignment kwargs — passed to add_ref_trace in every tab
-if show_ref:
-    ref_kw = dict(show_ref=True, L=L, r_arr=r_arr,
-                  ref_D=ref_D, ref_beta=ref_beta,
-                  ref_color=ref_color, ref_choice=ref_choice,
-                  MU=MU, V_MOD=V_MOD, omega_r=omega_r)
-else:
-    ref_kw = dict(show_ref=False, L=L, r_arr=r_arr,
-                  ref_D=0, ref_beta=0, ref_color="#fff",
-                  ref_choice="", MU=MU, V_MOD=V_MOD, omega_r=omega_r)
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # HEADER
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -489,7 +296,6 @@ with tab1:
                 hovertemplate="r = %{x:.1f} mm<br>φ = %{y:.3f}°<extra></extra>",
             ))
 
-        add_ref_trace(fig1, "phi", **ref_kw)
         fig1.update_layout(
             **LAYOUT_BASE,
             title=dict(text="Tracking angle φ vs groove radius  [Bauer Eq. 4, exact]",
@@ -603,7 +409,6 @@ with tab2:
                               line=dict(color=cfg["color"], width=1, dash="dot"),
                               opacity=0.6)
 
-    add_ref_trace(fig_err, "alpha", **ref_kw)
     fig_err.update_layout(
         **LAYOUT_BASE,
         title=dict(
@@ -672,7 +477,6 @@ with tab3:
             hovertemplate="r = %{x:.1f} mm<br>Fr/Fv = %{y:.3f} %<extra></extra>",
         ))
 
-    add_ref_trace(fig2, "skating", **ref_kw)
     fig2.update_layout(
         **LAYOUT_BASE,
         title=dict(
@@ -746,7 +550,6 @@ with tab4:
             fig3.add_vline(x=z, line=dict(color=cfg["color"], width=0.8, dash="dot"),
                            opacity=0.5)
 
-    add_ref_trace(fig3, "distortion", **ref_kw)
     fig3.update_layout(
         **LAYOUT_BASE,
         title=dict(
