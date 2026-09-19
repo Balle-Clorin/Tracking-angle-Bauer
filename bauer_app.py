@@ -259,62 +259,48 @@ with st.sidebar:
     st.markdown("## 🎵 Bauer (1945)")
     st.markdown("---")
 
+    # ── Groove radii ─────────────────────────────────────────────────────────
     st.markdown("### Record groove radii")
     outer_choice = st.selectbox(
         "Outer groove radius",
         list(OUTER_PRESETS.keys()) + ["Custom"],
-        index=0, key="outer_preset",
+        key="outer_preset",
     )
     if outer_choice == "Custom":
-        R_OUTER = st.number_input("Outer radius (mm)", 60.0, 200.0, 146.05,
-                                  step=0.01, format="%.3f", key="outer_custom")
+        R_OUTER = st.number_input("Outer radius (mm)", 60.0, 200.0,
+                                  step=0.01, format="%.3f", key="outer_custom",
+                                  value=st.session_state.get("outer_custom", 146.05))
     else:
         R_OUTER = OUTER_PRESETS[outer_choice]
 
     inner_choice = st.selectbox(
         "Inner groove radius",
         list(INNER_PRESETS.keys()) + ["Custom"],
-        index=0, key="inner_preset",
+        key="inner_preset",
     )
     if inner_choice == "Custom":
-        R_INNER = st.number_input("Inner radius (mm)", 20.0, 100.0, 60.325,
-                                  step=0.01, format="%.3f", key="inner_custom")
+        R_INNER = st.number_input("Inner radius (mm)", 20.0, 100.0,
+                                  step=0.01, format="%.3f", key="inner_custom",
+                                  value=st.session_state.get("inner_custom", 60.325))
     else:
         R_INNER = INNER_PRESETS[inner_choice]
 
     st.caption(f"r₁ = {R_INNER:.3f} mm  ·  r₂ = {R_OUTER:.3f} mm")
     st.markdown("---")
 
+    # ── Tonearm ──────────────────────────────────────────────────────────────
     st.markdown("### Tonearm")
-    col_sl, col_nb = st.columns([3, 2])
-    with col_sl:
-        L_sl = st.slider("l (mm)", 150.0, 350.0,
-                         st.session_state.get("L", 230.0), 0.1,
-                         key="L_slider", label_visibility="visible")
-    with col_nb:
-        L = st.number_input("mm", 150.0, 350.0,
-                            value=L_sl, step=0.01, format="%.2f",
-                            key="L_num", label_visibility="visible")
-    if L != L_sl:
-        st.session_state["L"] = L
-    else:
-        st.session_state["L"] = L_sl
-        L = L_sl
+    L = st.number_input("Effective length  l  (mm)", 150.0, 350.0,
+                        step=0.01, format="%.2f", key="L",
+                        value=st.session_state.get("L", 230.0))
 
     st.caption("Head offset angle β — used in tabs 2 & 4")
-    col_sl, col_nb = st.columns([3, 2])
-    with col_sl:
-        beta_sl = st.slider("β (°)", 0.0, 35.0,
-                            st.session_state.get("BETA", 20.0), 0.01,
-                            key="beta_slider", label_visibility="visible",
-                            help="Angle between arm centreline and cartridge axis")
-    with col_nb:
-        BETA_DEG = st.number_input("β°", 0.0, 35.0,
-                                   value=beta_sl, step=0.01, format="%.2f",
-                                   key="beta_num", label_visibility="collapsed")
-    BETA_DEG = BETA_DEG if BETA_DEG != beta_sl else beta_sl
-    st.session_state["BETA"] = BETA_DEG
+    BETA_DEG = st.number_input("Offset angle  β  (°)", 0.0, 35.0,
+                               step=0.01, format="%.2f", key="BETA_DEG",
+                               value=st.session_state.get("BETA_DEG", 20.0),
+                               help="Angle between arm centreline and cartridge axis")
 
+    # ── Overhang curves ───────────────────────────────────────────────────────
     st.markdown("### Overhang curves  D (mm)")
     st.caption("Up to 4 curves — add or remove freely")
 
@@ -323,21 +309,19 @@ with st.sidebar:
 
     to_remove = None
     for idx, D_val in enumerate(st.session_state.overhangs):
-        col_s, col_n, col_x = st.columns([3, 2, 1])
-        with col_s:
-            d_sl = st.slider(
-                f"D{idx+1}", -60.0, 100.0, float(D_val), 0.1,
-                key=f"d_slider_{idx}", label_visibility="collapsed",
-            )
+        col_n, col_x = st.columns([5, 1])
         with col_n:
-            d_nb = st.number_input(
-                "mm", -60.0, 100.0, value=d_sl, step=0.01, format="%.2f",
-                key=f"d_num_{idx}", label_visibility="collapsed",
+            new_val = st.number_input(
+                f"D{idx+1} (mm)", -60.0, 100.0,
+                value=float(D_val), step=0.01, format="%.2f",
+                key=f"d_val_{idx}", label_visibility="visible",
             )
+            st.session_state.overhangs[idx] = new_val
         with col_x:
+            st.markdown("<div style='margin-top:28px'>", unsafe_allow_html=True)
             if st.button("✕", key=f"rm_{idx}"):
                 to_remove = idx
-        st.session_state.overhangs[idx] = d_nb if d_nb != d_sl else d_sl
+            st.markdown("</div>", unsafe_allow_html=True)
 
     if to_remove is not None:
         st.session_state.overhangs.pop(to_remove)
@@ -359,11 +343,10 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("### Reference alignment (optional)")
-    st.caption("Adds a reference curve to all tabs — shows the classic β/D solution for this arm length")
+    st.caption("Adds a reference curve to all tabs")
     ref_choice = st.selectbox(
         "Alignment standard",
         ["— none —", "Löfgren A (IEC / Baerwald)", "Löfgren B", "Stevenson"],
-        index=0,
         key="ref_alignment",
     )
     show_ref = ref_choice != "— none —"
@@ -380,36 +363,18 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("### Skating force (Tab 3)")
-    col_sl, col_nb = st.columns([3, 2])
-    with col_sl:
-        mu_sl = st.slider("µ", 0.10, 0.80,
-                          st.session_state.get("MU", 0.25), 0.01,
-                          key="mu_slider", label_visibility="visible",
-                          help="Bauer typical ≈ 0.25")
-    with col_nb:
-        MU = st.number_input("µ val", 0.10, 0.80,
-                             value=mu_sl, step=0.01, format="%.2f",
-                             key="mu_num", label_visibility="collapsed")
-    MU = MU if MU != mu_sl else mu_sl
-    st.session_state["MU"] = MU
+    MU = st.number_input("Friction coefficient  µ", 0.10, 0.80,
+                         step=0.01, format="%.2f", key="MU",
+                         value=st.session_state.get("MU", 0.25),
+                         help="Bauer typical ≈ 0.25; soft vinyl / heavy stylus → higher")
 
     st.markdown("---")
     st.markdown("### Distortion (Tab 4)")
-
-    col_sl, col_nb = st.columns([3, 2])
-    with col_sl:
-        vmod_sl = st.slider("ωA (mm/s)", 20.0, 150.0,
-                            st.session_state.get("VMOD", 70.0), 0.5,
-                            key="vmod_slider", label_visibility="visible",
-                            help="Peak groove modulation velocity")
-    with col_nb:
-        V_MOD = st.number_input("mm/s", 20.0, 150.0,
-                                value=vmod_sl, step=0.1, format="%.1f",
-                                key="vmod_num", label_visibility="collapsed")
-    V_MOD = V_MOD if V_MOD != vmod_sl else vmod_sl
-    st.session_state["VMOD"] = V_MOD
-
-    RPM = st.selectbox("Record speed (rpm)", [33.33, 45.0, 78.0], index=0)
+    V_MOD = st.number_input("Peak modulation velocity  ωA  (mm/s)", 20.0, 150.0,
+                            step=0.5, format="%.1f", key="V_MOD",
+                            value=st.session_state.get("V_MOD", 70.0),
+                            help="Bauer ref ≈ 67 mm/s; commercial pressings often higher")
+    RPM = st.selectbox("Record speed (rpm)", [33.33, 45.0, 78.0], key="RPM")
 
     st.markdown("---")
     st.caption("Bauer, B.B. (1945). *Tracking Angle in Phonograph Pickups*. Electronics, March 1945.")
