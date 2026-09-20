@@ -251,7 +251,7 @@ with st.sidebar:
     st.markdown("### Tonearm")
     if "L" not in st.session_state:
         st.session_state["L"] = 233.15
-    L = st.number_input("Effective length  l  (mm)", 150.0, 350.0,
+    L = st.number_input("Effective length  l  (mm)", 150.0, 400.0,
                         step=0.01, format="%.2f", key="L")
 
     st.caption("Head offset angle β is now set per curve above.")
