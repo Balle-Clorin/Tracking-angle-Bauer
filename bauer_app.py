@@ -797,10 +797,10 @@ with tab3:
     st.plotly_chart(fig2, use_container_width=True)
 
     st.caption(
-        f"Fr = µ · Fv · tan(β)  (Bauer p.112) — this is the **radial skating force** "
+        f"Fr = µ · Fv · tan(φ)  (Bauer p.112) — this is the **radial skating force** "
         f"(force directed toward the spindle along the groove radius).  "
         f"Note: the tonearm arc side force (force perpendicular to the arm, "
-        f"causing the arm to skate inward) is Fr · sin(β), not tan(β) directly. the radial force is typically 8% larger than fore along the tonearm path, Tan(22)/Sin(22) "
+        f"causing the arm to skate inward) is Fr · sin(φ), not tan(φ) directly. the radial force is typically 8% larger than fore along the tonearm path, Tan(22)/Sin(22) "
         f"µ = {MU:.2f} set in sidebar."
     )
 
