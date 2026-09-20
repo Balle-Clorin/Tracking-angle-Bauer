@@ -297,10 +297,15 @@ with st.sidebar:
         st.session_state.overhangs.pop(to_remove)
         st.rerun()
 
-    col_add, = st.columns([1])
+    col_add, col_eq = st.columns(2)
     with col_add:
         if st.button("＋ Add curve") and len(st.session_state.overhangs) < 4:
             st.session_state.overhangs.append((17.8, 23.63))
+            st.rerun()
+    with col_eq:
+        if st.button("＋ Add Eq.22"):
+            d22 = eq22_D(L, R_INNER, R_OUTER)
+            st.session_state.overhangs.append((round(d22, 3), 0.0))
             st.rerun()
 
     D_eq22 = eq22_D(L, R_INNER, R_OUTER)
