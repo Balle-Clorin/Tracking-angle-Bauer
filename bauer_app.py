@@ -800,7 +800,7 @@ with tab3:
         f"Fr = µ · Fv · tan(β)  (Bauer p.112) — this is the **radial skating force** "
         f"(force directed toward the spindle along the groove radius).  "
         f"Note: the tonearm arc side force (force perpendicular to the arm, "
-        f"causing the arm to skate inward) is Fr · sin(β), not tan(β) directly. the radial force is typically 8% larger "
+        f"causing the arm to skate inward) is Fr · sin(β), not tan(β) directly. the radial force is typically 8% larger than fore along the tonearm path, Tan(22)/Sin(22) "
         f"µ = {MU:.2f} set in sidebar."
     )
 
