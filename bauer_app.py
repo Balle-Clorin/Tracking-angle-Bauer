@@ -251,7 +251,7 @@ with st.sidebar:
     st.markdown("### Tonearm")
     if "L" not in st.session_state:
         st.session_state["L"] = 233.15
-    L = st.number_input("Effective length  l  (mm)", 150.0, 400.0,
+    L = st.number_input("Effective length  l  (mm)", 150.0, 350.0,
                         step=0.01, format="%.2f", key="L")
 
     st.caption("Head offset angle β is now set per curve above.")
@@ -297,19 +297,21 @@ with st.sidebar:
         st.session_state.overhangs.pop(to_remove)
         st.rerun()
 
-    col_add, col_eq = st.columns(2)
+    col_add, = st.columns([1])
     with col_add:
         if st.button("＋ Add curve") and len(st.session_state.overhangs) < 4:
             st.session_state.overhangs.append((17.8, 23.63))
             st.rerun()
-    with col_eq:
-        if st.button("＋ Eq.22"):
-            d22 = eq22_D(L, R_INNER, R_OUTER)
-            st.session_state.overhangs.append((round(d22, 3), 0.0))
-            st.rerun()
 
     D_eq22 = eq22_D(L, R_INNER, R_OUTER)
-    st.info(f"Eq.22: D = {D_eq22:.3f} mm\n(β=0, optimal underhung, l={L:.2f} mm)")
+    if "show_eq22" not in st.session_state:
+        st.session_state["show_eq22"] = False
+    show_eq22 = st.checkbox(
+        f"Include underhung arm (Eq.22)  D = {D_eq22:.2f} mm, β = 0°",
+        key="show_eq22",
+        help="Bauer Eq.22 optimal underhung arm — negative overhang, β=0. "
+             "Y-axis rescales automatically when this is toggled."
+    )
 
     st.markdown("---")
     st.markdown("### Standard alignment (optional)")
@@ -359,14 +361,15 @@ OVERHANGS = [
      "color": COLORS[i % len(COLORS)]}
     for i, (D, beta) in enumerate(OVERHANG_VALUES)
 ]
-# Eq.22 always added as last entry (β=0 by definition)
-eq22_color = COLORS[len(OVERHANGS) % len(COLORS)]
-OVERHANGS.append({
-    "D": D_eq22, "beta": 0.0,
-    "label": f"D = {D_eq22:.2f} mm  (Eq.22 optimal underhung, β=0)",
-    "color": eq22_color,
-    "eq22": True,
-})
+# Eq.22 appended only when toggled on
+if show_eq22:
+    eq22_color = COLORS[len(OVERHANGS) % len(COLORS)]
+    OVERHANGS.append({
+        "D": D_eq22, "beta": 0.0,
+        "label": f"D = {D_eq22:.2f} mm  (Eq.22 optimal underhung, β=0)",
+        "color": eq22_color,
+        "eq22": True,
+    })
 
 omega_r  = 2 * np.pi * RPM / 60.0
 
@@ -800,7 +803,7 @@ with tab3:
         f"Fr = µ · Fv · tan(φ)  (Bauer p.112) — this is the **radial skating force** "
         f"(force directed toward the spindle along the groove radius).  "
         f"Note: the tonearm arc side force (force perpendicular to the arm, "
-        f"causing the arm to skate inward) is Fr · sin(φ), not tan(φ) directly. the radial force is typically 8% larger than fore along the tonearm path, Tan(22)/Sin(22) "
+        f"causing the arm to skate inward) is Fr · sin(β), not tan(φ) directly.  "
         f"µ = {MU:.2f} set in sidebar."
     )
 
