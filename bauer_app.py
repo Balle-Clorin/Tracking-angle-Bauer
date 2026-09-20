@@ -55,16 +55,16 @@ COLORS  = ["#4c9ec4", "#c9a050", "#6db87a", "#c96e85", "#9b84c9", "#d4856a"]
 
 # Groove radius presets  (name: (r_inner, r_outer))
 OUTER_PRESETS = {
-    "12″ DIN                   (146.0 mm)":  146.0,
     "12″ IEC 1958 / RIAA 1963  (146.05 mm)": 146.05,
+    "12″ DIN                   (146.0 mm)":  146.0,
     "12″ IEC 1964              (146.3 mm)":  146.30,
     "12″ JIS 1981              (146.6 mm)":  146.60,
     "10″ IEC 1987              (120.9 mm)":  120.90,
     "7″  IEC 1987              (84.15 mm)":   84.15,
 }
 INNER_PRESETS = {
-    "DIN                   (57.5 mm)":    57.50,
     "IEC 1958 / RIAA 1963  (60.325 mm)": 60.325,
+    "DIN                   (57.5 mm)":    57.50,
     "JIS 1981              (57.6 mm)":    57.60,
 }
 
@@ -80,7 +80,11 @@ def eq22_D(l, r1, r2):
     return -1.0 / (l * (1.0 / r1**2 + 1.0 / r2**2))
 
 def distortion_pct(r, l, D, beta_rad, v_mod, omega_r):
-    """Bauer Eq. (16) — % 2nd harmonic, velocity basis."""
+    """Bauer Eq. (16) — % 2nd harmonic distortion, velocity basis.
+    HD2 = (ωA · |α|) / (ωr · r) × 100%
+    where ωA = peak stylus velocity (mm/s), ωr·r = groove velocity (mm/s),
+    α = φ − β = tracking error (radians).
+    """
     alpha = tracking_angle_exact(r, l, D) - beta_rad
     return v_mod * np.abs(alpha) / (omega_r * r) * 100.0
 
@@ -250,38 +254,44 @@ with st.sidebar:
     L = st.number_input("Effective length  l  (mm)", 150.0, 350.0,
                         step=0.01, format="%.2f", key="L")
 
-    st.caption("Head offset angle β — used in tabs 2 & 4")
-    if "BETA_DEG" not in st.session_state:
-        st.session_state["BETA_DEG"] = 23.63
-    BETA_DEG = st.number_input("Offset angle  β  (°)", 0.0, 35.0,
-                               step=0.01, format="%.2f", key="BETA_DEG",
-                               help="Angle between arm centreline and cartridge axis")
+    st.caption("Head offset angle β is now set per curve above.")
 
     # ── Overhang curves ───────────────────────────────────────────────────────
-    st.markdown("### Overhang curves  D (mm)")
-    st.caption("Up to 4 curves — add or remove freely")
+    st.markdown("### Overhang curves  D (mm) and offset angle β (°)")
+    st.caption("Up to 4 curves — each with its own D and β")
 
     if "overhangs" not in st.session_state:
-        st.session_state.overhangs = [17.8]
+        st.session_state.overhangs = [(17.8, 23.63)]
+
+    # Migrate old format (list of floats) to new format (list of tuples)
+    if st.session_state.overhangs and not isinstance(st.session_state.overhangs[0], (list, tuple)):
+        st.session_state.overhangs = [(d, 23.63) for d in st.session_state.overhangs]
 
     to_remove = None
-    for idx, D_val in enumerate(st.session_state.overhangs):
-        col_n, col_x = st.columns([5, 1])
-        with col_n:
-            key = f"d_val_{idx}"
-            if key not in st.session_state:
-                st.session_state[key] = float(D_val)
-            new_val = st.number_input(
+    for idx, (D_val, beta_val) in enumerate(st.session_state.overhangs):
+        col_d, col_b, col_x = st.columns([3, 3, 1])
+        with col_d:
+            key_d = f"d_val_{idx}"
+            if key_d not in st.session_state:
+                st.session_state[key_d] = float(D_val)
+            new_D = st.number_input(
                 f"D{idx+1} (mm)", -60.0, 100.0,
-                step=0.01, format="%.2f", key=key,
-                label_visibility="visible",
+                step=0.01, format="%.2f", key=key_d,
             )
-            st.session_state.overhangs[idx] = new_val
+        with col_b:
+            key_b = f"b_val_{idx}"
+            if key_b not in st.session_state:
+                st.session_state[key_b] = float(beta_val)
+            new_beta = st.number_input(
+                f"β{idx+1} (°)", 0.0, 35.0,
+                step=0.01, format="%.2f", key=key_b,
+            )
         with col_x:
             st.markdown("<div style='margin-top:28px'>", unsafe_allow_html=True)
             if st.button("✕", key=f"rm_{idx}"):
                 to_remove = idx
             st.markdown("</div>", unsafe_allow_html=True)
+        st.session_state.overhangs[idx] = (new_D, new_beta)
 
     if to_remove is not None:
         st.session_state.overhangs.pop(to_remove)
@@ -290,12 +300,12 @@ with st.sidebar:
     col_add, col_eq = st.columns(2)
     with col_add:
         if st.button("＋ Add curve") and len(st.session_state.overhangs) < 4:
-            st.session_state.overhangs.append(15.0)
+            st.session_state.overhangs.append((17.8, 23.63))
             st.rerun()
     with col_eq:
         if st.button("＋ Eq.22"):
             d22 = eq22_D(L, R_INNER, R_OUTER)
-            st.session_state.overhangs.append(round(d22, 3))
+            st.session_state.overhangs.append((round(d22, 3), 0.0))
             st.rerun()
 
     D_eq22 = eq22_D(L, R_INNER, R_OUTER)
@@ -320,7 +330,7 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### Skating force (Tab 3)")
     if "MU" not in st.session_state:
-        st.session_state["MU"] = 0.25
+        st.session_state["MU"] = 0.30
     MU = st.number_input("Friction coefficient  µ", 0.10, 0.80,
                          step=0.01, format="%.2f", key="MU",
                          help="Bauer typical ≈ 0.25; soft vinyl / heavy stylus → higher")
@@ -344,18 +354,20 @@ with st.sidebar:
 r_arr = np.linspace(R_INNER, R_OUTER, N)
 
 OVERHANG_VALUES = st.session_state.overhangs
-OVERHANGS = [{"D": D, "label": make_label(D), "color": COLORS[i % len(COLORS)]}
-             for i, D in enumerate(OVERHANG_VALUES)]
-# Eq.22 always added as last entry
+OVERHANGS = [
+    {"D": D, "beta": beta, "label": f"{make_label(D)}  β={beta:.2f}°",
+     "color": COLORS[i % len(COLORS)]}
+    for i, (D, beta) in enumerate(OVERHANG_VALUES)
+]
+# Eq.22 always added as last entry (β=0 by definition)
 eq22_color = COLORS[len(OVERHANGS) % len(COLORS)]
 OVERHANGS.append({
-    "D": D_eq22,
+    "D": D_eq22, "beta": 0.0,
     "label": f"D = {D_eq22:.2f} mm  (Eq.22 optimal underhung, β=0)",
     "color": eq22_color,
     "eq22": True,
 })
 
-beta_rad = np.radians(BETA_DEG)
 omega_r  = 2 * np.pi * RPM / 60.0
 
 # ── Reference alignment trace kwargs ─────────────────────────────────────────
@@ -645,10 +657,9 @@ with tab1:
 with tab2:
 
     # ── Y-axis range controls ─────────────────────────────────────────────────
-    # Compute the full data range first so defaults are sensible
     all_alpha = []
     for cfg in OVERHANGS:
-        beta_use = 0.0 if cfg.get("eq22") else beta_rad
+        beta_use = 0.0 if cfg.get("eq22") else np.radians(cfg["beta"])
         all_alpha.append(np.degrees(tracking_angle_exact(r_arr, L, cfg["D"]) - beta_use))
     all_alpha = np.concatenate(all_alpha)
     data_ymin = float(np.floor(all_alpha.min()))
@@ -676,17 +687,12 @@ with tab2:
     fig_err.add_hline(y=0, line=dict(color="#32373f", width=1, dash="dot"))
 
     for cfg in OVERHANGS:
-        D = cfg["D"]
+        D         = cfg["D"]
         phi_arr   = tracking_angle_exact(r_arr, L, D)
-        beta_use  = 0.0 if cfg.get("eq22") else beta_rad
+        beta_use  = 0.0 if cfg.get("eq22") else np.radians(cfg["beta"])
         alpha_arr = np.degrees(phi_arr - beta_use)
         nulls     = find_nulls(phi_arr - beta_use, r_arr)
-
-        if cfg.get("eq22"):
-            label = f"D = {D:.2f} mm,  β = 0°  (Eq.22 optimal underhung)"
-        else:
-            sign  = "+" if D > 0 else ""
-            label = f"D = {sign}{D:.2f} mm,  β = {BETA_DEG:.2f}°"
+        label     = cfg["label"]
 
         hover = "r = %{x:.1f} mm<br>α = %{y:.3f}°"
         if nulls:
@@ -706,13 +712,13 @@ with tab2:
                               line=dict(color=cfg["color"], width=1, dash="dot"),
                               opacity=0.6)
 
-        add_ref_trace(fig_err, "alpha", ref_kw)
-        fig_err.update_layout(
-            **LAYOUT_BASE,
-            title=dict(
-                text=f"Tracking error  α = φ − β   [β = {BETA_DEG:.2f}°,  Bauer Eq. 4 exact]",
-                font=dict(color="#dce1e9", size=12)),
-            xaxis_title="Groove radius  r  (mm)",
+    add_ref_trace(fig_err, "alpha", ref_kw)
+    fig_err.update_layout(
+        **LAYOUT_BASE,
+        title=dict(
+            text="Tracking error  α = φ − β   [Bauer Eq. 4 exact]",
+            font=dict(color="#dce1e9", size=12)),
+        xaxis_title="Groove radius  r  (mm)",
         yaxis_title="Tracking error  α  (degrees)",
         yaxis_range=[y_lo, y_hi],
         shapes=[vline(R_INNER), vline(R_OUTER)],
@@ -730,21 +736,18 @@ with tab2:
     st.markdown("#### Null radii  (α = 0, perfect tangency)")
     null_cols = st.columns(len(OVERHANGS))
     for col, cfg in zip(null_cols, OVERHANGS):
-        D        = cfg["D"]
-        beta_use = 0.0 if cfg.get("eq22") else beta_rad
+        D         = cfg["D"]
+        beta_use  = 0.0 if cfg.get("eq22") else np.radians(cfg["beta"])
         alpha_arr = tracking_angle_exact(r_arr, L, D) - beta_use
-        nulls    = find_nulls(alpha_arr, r_arr)
-        color    = cfg["color"]
-        clabel   = cfg["label"] if cfg.get("eq22") else \
-                   (f"D = {'+' if D>0 else ''}{D:.2f} mm,  β = {BETA_DEG:.2f}°"
-                    if D != 0 else f"D = 0 mm,  β = {BETA_DEG:.2f}°")
+        nulls     = find_nulls(alpha_arr, r_arr)
+        color     = cfg["color"]
         null_rows = "".join(f"<div class='value null-row'>{z:.1f} mm</div>" for z in nulls)
         no_null   = "<div class='value' style='color:#c96e85'>none in range</div>" \
                     if not nulls else ""
         with col:
             st.markdown(
                 f"<div class='metric-box'>"
-                f"<div style='color:{color};font-weight:bold'>{clabel}</div>"
+                f"<div style='color:{color};font-weight:bold'>{cfg['label']}</div>"
                 f"<div class='label'>Null radii</div>"
                 + null_rows + no_null +
                 "</div>",
@@ -752,10 +755,10 @@ with tab2:
             )
 
     st.caption(
-        f"α = φ(r) − β   where φ is the exact Bauer Eq.(4) tracking angle "
-        f"and β = {BETA_DEG:.2f}° is the arm head offset angle.  "
-        f"Dotted vertical lines mark the null radii where α = 0 "
-        f"(stylus tangent to groove)."
+        "α = φ(r) − β  where φ is the exact Bauer Eq.(4) tracking angle "
+        "and β is the head offset angle set per curve in the sidebar.  "
+        "Dotted vertical lines mark the null radii where α = 0 "
+        "(stylus tangent to groove)."
     )
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -794,9 +797,11 @@ with tab3:
     st.plotly_chart(fig2, use_container_width=True)
 
     st.caption(
-        f"Fr = F · tan(φ)  where  F = µ · Fv  (Bauer p.112).  "
-        f"µ = {MU:.2f} set in sidebar.  Bauer typical µ ≈ 0.25; "
-        f"soft vinyl / heavy stylus → higher µ."
+        f"Fr = µ · Fv · tan(β)  (Bauer p.112) — this is the **radial skating force** "
+        f"(force directed toward the spindle along the groove radius).  "
+        f"Note: the tonearm arc side force (force perpendicular to the arm, "
+        f"causing the arm to skate inward) is Fr · sin(β), not tan(β) directly. the radial force is typically 8% larger "
+        f"µ = {MU:.2f} set in sidebar."
     )
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -814,23 +819,14 @@ with tab4:
                    annotation_position="bottom right")
 
     for cfg in OVERHANGS:
-        D = cfg["D"]
-        if cfg.get("eq22"):
-            beta_use = 0.0
-            label    = f"D = {D:.2f} mm,  β = 0°  (Eq.22 optimal underhung)"
-            lw, dash = 2.2, "dash"
-        else:
-            beta_use = beta_rad
-            sign     = "+" if D > 0 else ""
-            label    = f"D = {sign}{D:.2f} mm,  β = {BETA_DEG:.2f}°"
-            lw, dash = 1.8, "solid"
+        D        = cfg["D"]
+        beta_use = 0.0 if cfg.get("eq22") else np.radians(cfg["beta"])
+        label    = cfg["label"]
+        lw, dash = (2.2, "dash") if cfg.get("eq22") else (1.8, "solid")
 
-        dp = distortion_pct(r_arr, L, D, beta_use, V_MOD, omega_r)
-        nulls = find_nulls(dp - 0, r_arr)  # zeros of distortion ≈ nulls of alpha
-
-        # Find actual nulls of tracking error (where distortion = 0)
+        dp        = distortion_pct(r_arr, L, D, beta_use, V_MOD, omega_r)
         alpha_arr = tracking_angle_exact(r_arr, L, D) - beta_use
-        nulls = find_nulls(alpha_arr, r_arr)
+        nulls     = find_nulls(alpha_arr, r_arr)
 
         hover = "r = %{x:.1f} mm<br>HD2 = %{y:.3f} %"
         if nulls:
@@ -844,7 +840,6 @@ with tab4:
             hovertemplate=hover,
         ))
 
-        # Mark null radii with vertical dotted lines
         for z in nulls:
             fig3.add_vline(x=z, line=dict(color=cfg["color"], width=0.8, dash="dot"),
                            opacity=0.5)
@@ -854,7 +849,7 @@ with tab4:
         **LAYOUT_BASE,
         title=dict(
             text=f"2nd-order distortion  [Bauer Eq. 16, velocity basis]   "
-                 f"β = {BETA_DEG:.2f}°  ·  ωA = {V_MOD:.0f} mm/s  ·  {RPM:.2f} rpm",
+                 f"ωA = {V_MOD:.0f} mm/s  ·  {RPM:.2f} rpm",
             font=dict(color="#dce1e9", size=12)),
         xaxis_title="Groove radius  r  (mm)",
         yaxis_title="2nd harmonic distortion  (%)",
@@ -871,18 +866,17 @@ with tab4:
     st.markdown("#### Distortion null radii  (tracking error α = 0)")
     null_cols = st.columns(len(OVERHANGS))
     for col, cfg in zip(null_cols, OVERHANGS):
-        D = cfg["D"]
-        beta_use = 0.0 if cfg.get("eq22") else beta_rad
+        D         = cfg["D"]
+        beta_use  = 0.0 if cfg.get("eq22") else np.radians(cfg["beta"])
         alpha_arr = tracking_angle_exact(r_arr, L, D) - beta_use
-        nulls = find_nulls(alpha_arr, r_arr)
+        nulls     = find_nulls(alpha_arr, r_arr)
         with col:
-            color  = cfg["color"]
-            clabel = cfg["label"]
+            color     = cfg["color"]
             null_rows = "".join(f"<div class='value null-row'>{z:.1f} mm</div>" for z in nulls)
             no_null   = "<div class='value' style='color:#c96e85'>none in range</div>" if not nulls else ""
             st.markdown(
                 f"<div class='metric-box'>"
-                f"<div style='color:{color};font-weight:bold'>{clabel}</div>"
+                f"<div style='color:{color};font-weight:bold'>{cfg['label']}</div>"
                 f"<div class='label'>Null radii</div>"
                 + null_rows + no_null +
                 "</div>",
