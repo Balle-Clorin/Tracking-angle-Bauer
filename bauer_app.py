@@ -249,10 +249,34 @@ with st.sidebar:
 
     # ── Tonearm ──────────────────────────────────────────────────────────────
     st.markdown("### Tonearm")
-    if "L" not in st.session_state:
-        st.session_state["L"] = 233.15
-    L = st.number_input("Effective length  l  (mm)", 150.0, 400.0,
-                        step=0.01, format="%.2f", key="L")
+
+    arm_input_mode = st.radio(
+        "Specify arm geometry by",
+        ["Effective length  l", "Pivot-to-spindle distance  d"],
+        key="arm_input_mode",
+        horizontal=True,
+    )
+
+    if arm_input_mode == "Effective length  l":
+        if "L" not in st.session_state:
+            st.session_state["L"] = 233.15
+        L = st.number_input("Effective length  l  (mm)", 150.0, 400.0,
+                            step=0.01, format="%.2f", key="L")
+        # Compute d from first overhang curve for display
+        D0 = st.session_state.overhangs[0][0] \
+             if st.session_state.get("overhangs") else 17.8
+        d_spindle = L - D0
+        st.caption(f"Pivot-to-spindle  d = l − D₁ = {d_spindle:.2f} mm")
+    else:
+        if "d_spindle" not in st.session_state:
+            st.session_state["d_spindle"] = 215.36   # SME V default
+        d_input = st.number_input("Pivot-to-spindle distance  d  (mm)", 100.0, 380.0,
+                                  step=0.01, format="%.2f", key="d_spindle")
+        # l = d + D  — use first overhang curve's D
+        D0 = st.session_state.overhangs[0][0] \
+             if st.session_state.get("overhangs") else 17.8
+        L = d_input + D0
+        st.caption(f"Effective length  l = d + D₁ = {L:.2f} mm")
 
     st.caption("Head offset angle β is now set per curve above.")
 
