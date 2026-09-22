@@ -341,6 +341,14 @@ with st.sidebar:
     MU = st.number_input("Friction coefficient  µ", 0.10, 0.80,
                          step=0.01, format="%.2f", key="MU",
                          help="Bauer typical ≈ 0.25; soft vinyl / heavy stylus → higher")
+    skate_mode = st.radio(
+        "Show skating force component",
+        ["Radial  µ·tan(φ)", "Tonearm arc  µ·sin(φ)", "Both"],
+        key="skate_mode",
+        help="Radial µ·tan(φ): force directed toward spindle along groove radius (Bauer p.112).  "
+             "Tonearm arc µ·sin(φ): side force perpendicular to the arm — "
+             "this is what actually drives the arm inward along its arc.",
+    )
 
     st.markdown("---")
     st.markdown("### Distortion (Tab 4)")
@@ -405,8 +413,9 @@ def add_ref_trace(fig, mode, kw):
         y  = np.degrees(phi - br)
         ht = "r = %{x:.1f} mm<br>α = %{y:.3f}°<extra></extra>"
     elif mode == "skating":
+        # Reference curve always shows radial force µ·tan(φ)
         y  = kw["MU"] * np.tan(phi) * 100.0
-        ht = "r = %{x:.1f} mm<br>Fr/Fv = %{y:.3f}%<extra></extra>"
+        ht = "r = %{x:.1f} mm<br>µ·tan(φ) = %{y:.3f}%<extra></extra>"
     elif mode == "distortion":
         y  = distortion_pct(r, L_, D_, br, kw["V_MOD"], kw["omega_r"])
         ht = "r = %{x:.1f} mm<br>HD2 = %{y:.3f}%<extra></extra>"
@@ -775,26 +784,54 @@ with tab2:
 
 with tab3:
     fig2 = go.Figure()
+
+    show_radial = skate_mode in ("Radial  µ·tan(φ)", "Both")
+    show_arc    = skate_mode in ("Tonearm arc  µ·sin(φ)", "Both")
+
     for cfg in OVERHANGS:
         phi_arr = tracking_angle_exact(r_arr, L, cfg["D"])
-        fr_mu   = MU * np.tan(phi_arr) * 100.0
-        fig2.add_trace(go.Scatter(
-            x=r_arr, y=fr_mu, name=cfg["label"],
-            line=dict(color=cfg["color"],
-                      width=2.2 if cfg.get("eq22") else 1.8,
-                      dash="dash" if cfg.get("eq22") else "solid"),
-            hovertemplate="r = %{x:.1f} mm<br>Fr/Fv = %{y:.3f} %<extra></extra>",
-        ))
+        lw   = 2.2 if cfg.get("eq22") else 1.8
+        dash = "dash" if cfg.get("eq22") else "solid"
+        col  = cfg["color"]
+
+        if show_radial:
+            fr_radial = MU * np.tan(phi_arr) * 100.0
+            name_r = cfg["label"] + ("  [tan]" if show_arc else "")
+            fig2.add_trace(go.Scatter(
+                x=r_arr, y=fr_radial, name=name_r,
+                line=dict(color=col, width=lw, dash=dash),
+                hovertemplate="r = %{x:.1f} mm<br>µ·tan(φ) = %{y:.3f} %<extra></extra>",
+            ))
+
+        if show_arc:
+            fr_arc = MU * np.sin(phi_arr) * 100.0
+            name_a = cfg["label"] + ("  [sin]" if show_radial else "")
+            # Slightly lighter/dotted when shown alongside radial
+            dash_a = "dot" if show_radial else dash
+            fig2.add_trace(go.Scatter(
+                x=r_arr, y=fr_arc, name=name_a,
+                line=dict(color=col, width=lw, dash=dash_a),
+                hovertemplate="r = %{x:.1f} mm<br>µ·sin(φ) = %{y:.3f} %<extra></extra>",
+            ))
 
     add_ref_trace(fig2, "skating", ref_kw)
+
+    # Build title and y-axis label from mode
+    if show_radial and show_arc:
+        title_txt  = f"Skating force components   [µ = {MU:.2f},  Bauer Eq. 4 exact]"
+        yaxis_lbl  = f"µ·tan(φ) solid  /  µ·sin(φ) dotted   (% of VTF)"
+    elif show_radial:
+        title_txt  = f"Radial skating force  Fr = µ·tan(φ) × 100 %   [µ = {MU:.2f}]"
+        yaxis_lbl  = f"µ · tan(φ) × 100  (% of VTF)"
+    else:
+        title_txt  = f"Tonearm arc side force  Fs = µ·sin(φ) × 100 %   [µ = {MU:.2f}]"
+        yaxis_lbl  = f"µ · sin(φ) × 100  (% of VTF)"
+
     fig2.update_layout(
         **LAYOUT_BASE,
-        title=dict(
-            text=f"Radial skating force  Fr = µ · Fv · tan(φ) × 100 %   "
-                 f"[µ = {MU:.2f},  Bauer Eq. 4 exact]",
-            font=dict(color="#dce1e9", size=12)),
+        title=dict(text=title_txt, font=dict(color="#dce1e9", size=12)),
         xaxis_title="Groove radius  r  (mm)",
-        yaxis_title=f"µ · tan(φ) × 100  (%  of VTF)   [µ = {MU:.2f}]",
+        yaxis_title=yaxis_lbl,
         shapes=[vline(R_INNER), vline(R_OUTER), hline(0)],
         height=520,
         margin=dict(l=60, r=30, t=50, b=50),
@@ -805,11 +842,11 @@ with tab3:
     st.plotly_chart(fig2, use_container_width=True)
 
     st.caption(
-        f"Fr = µ · Fv · tan(φ)  (Bauer p.112) — this is the **radial skating force** "
-        f"(force directed toward the spindle along the groove radius).  "
-        f"Note: the tonearm arc side force (force perpendicular to the arm, "
-        f"causing the arm to skate inward) is Fr · sin(β), not tan(φ) directly.  "
-        f"µ = {MU:.2f} set in sidebar."
+        f"**Radial force** µ·Fv·tan(φ): force directed toward the spindle along the groove radius (Bauer p.112).  "
+        f"**Tonearm arc force** µ·Fv·sin(φ): component perpendicular to the tonearm — "
+        f"this is the side force that drives the arm inward along its pivot arc.  "
+        f"For typical offset angles (20–25°) the difference between tan and sin is small (~2%).  "
+        f"µ = {MU:.2f}."
     )
 
 # ═══════════════════════════════════════════════════════════════════════════════
