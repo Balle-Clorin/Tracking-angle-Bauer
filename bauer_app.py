@@ -152,7 +152,7 @@ def solve_alignment(name, l, R1, R2):
       N2 = (1+√½) / ((1−√½)/R1 + √2/R2)
 
     References:
-      Löfgren (1938) Akustische Zeitschrift Vol.3 pp.350–362
+      Löfgren (1938) Akustische Zeitschrift Vol.3 pp.–362
       Baerwald (1941) J. Soc. Motion Picture Engineers Vol.37
       Stevenson (1966) Wireless World May/June
       B.K. (2001) A Treatise on Cartridge Alignment, Audio Asylum
@@ -251,7 +251,7 @@ with st.sidebar:
     st.markdown("### Tonearm")
     if "L" not in st.session_state:
         st.session_state["L"] = 233.15
-    L = st.number_input("Effective length  l  (mm)", 150.0, 350.0,
+    L = st.number_input("Effective length  l  (mm)", 150.0, 400.0,
                         step=0.01, format="%.2f", key="L")
 
     st.caption("Head offset angle β is now set per curve above.")
