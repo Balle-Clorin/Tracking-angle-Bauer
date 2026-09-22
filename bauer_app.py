@@ -845,7 +845,7 @@ with tab3:
         f"**Radial force** µ·Fv·tan(φ): force directed toward the spindle along the groove radius (Bauer p.112).  "
         f"**Tonearm arc force** µ·Fv·sin(φ): component perpendicular to the tonearm — "
         f"this is the side force that drives the arm inward along its pivot arc.  "
-        f"For typical offset angles (20–25°) the difference between tan and sin is small (~8%), tou can coose to plot both.  "
+        f"For typical offset angles (20–25°) the difference between tan and sin is can be shown, as you can choose to plot both.  "
         f"µ = {MU:.2f}."
     )
 
