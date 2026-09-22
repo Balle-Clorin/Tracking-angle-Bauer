@@ -71,7 +71,7 @@ INNER_PRESETS = {
 # ── Physics ───────────────────────────────────────────────────────────────────
 
 def tracking_angle_exact(r, l, D):
-    """Bauer Eq. (4) — exact, no small-angle approximation."""
+    """Bauer Eq. (4) — exact, no -angle approximation."""
     sin_phi = r / (2 * l) + (2 * l * D - D**2) / (2 * l * r)
     return np.arcsin(np.clip(sin_phi, -1.0, 1.0))
 
@@ -845,7 +845,7 @@ with tab3:
         f"**Radial force** µ·Fv·tan(φ): force directed toward the spindle along the groove radius (Bauer p.112).  "
         f"**Tonearm arc force** µ·Fv·sin(φ): component perpendicular to the tonearm — "
         f"this is the side force that drives the arm inward along its pivot arc.  "
-        f"For typical offset angles (20–25°) the difference between tan and sin is small (~2%).  "
+        f"For typical offset angles (20–25°) the difference between tan and sin is small (~8%), tou can coose to plot both.  "
         f"µ = {MU:.2f}."
     )
 
