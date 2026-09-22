@@ -158,7 +158,7 @@ def solve_alignment(name, l, R1, R2):
       B.K. (2001) A Treatise on Cartridge Alignment, Audio Asylum
       Dennes, G. — A comparison of six major papers on tracking distortion
     """
-    s  = np.sqrt(0.5)      # = 1/√2 ≈ 0.7071
+    s  = np.sqrt(0.5)      # = 1/√2 ≈ 0.71
     s2 = np.sqrt(2.0)
 
     if name == "Löfgren A":
@@ -353,7 +353,7 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### Distortion (Tab 4)")
     if "V_MOD" not in st.session_state:
-        st.session_state["V_MOD"] = 70.0
+        st.session_state["V_MOD"] = 100.0
     V_MOD = st.number_input("Peak modulation velocity  ωA  (mm/s)", 20.0, 150.0,
                             step=0.5, format="%.1f", key="V_MOD",
                             help="Bauer ref ≈ 67 mm/s; commercial pressings often higher")
