@@ -876,12 +876,6 @@ with tab3:
 with tab4:
     fig3 = go.Figure()
 
-    # 2.2% Bauer reference line
-    fig3.add_hline(y=2.2, line=dict(color="#ffffff", width=0.8, dash="dot"),
-                   opacity=0.3,
-                   annotation_text="2.2 % (Bauer ref, straight arm)",
-                   annotation_font=dict(color="#ffffff", size=14),
-                   annotation_position="bottom right")
 
     for cfg in OVERHANGS:
         D        = cfg["D"]
