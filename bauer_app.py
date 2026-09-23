@@ -321,26 +321,11 @@ with st.sidebar:
         st.session_state.overhangs.pop(to_remove)
         st.rerun()
 
-    col_add, col_eq = st.columns(2)
-    with col_add:
-        if st.button("＋ Add curve") and len(st.session_state.overhangs) < 4:
-            st.session_state.overhangs.append((17.8, 23.63))
-            st.rerun()
-    with col_eq:
-        if st.button("＋ Add Eq.22"):
-            d22 = eq22_D(L, R_INNER, R_OUTER)
-            st.session_state.overhangs.append((round(d22, 3), 0.0))
-            st.rerun()
+    if st.button("＋ Add curve") and len(st.session_state.overhangs) < 4:
+        st.session_state.overhangs.append((17.8, 23.63))
+        st.rerun()
 
     D_eq22 = eq22_D(L, R_INNER, R_OUTER)
-    if "show_eq22" not in st.session_state:
-        st.session_state["show_eq22"] = False
-    show_eq22 = st.checkbox(
-        f"Include underhung arm (Eq.22)  D = {D_eq22:.2f} mm, β = 0°",
-        key="show_eq22",
-        help="Bauer Eq.22 optimal underhung arm — negative overhang, β=0. "
-             "Y-axis rescales automatically when this is toggled."
-    )
 
     st.markdown("---")
     st.markdown("### Standard alignment (optional)")
@@ -357,6 +342,15 @@ with st.sidebar:
             f"N1 = {ref_N1:.2f} mm  ·  N2 = {ref_N2:.2f} mm\n\n"
             f"D = {ref_D:.3f} mm  ·  β = {ref_beta:.3f}°"
         )
+
+    if "show_eq22" not in st.session_state:
+        st.session_state["show_eq22"] = False
+    show_eq22 = st.checkbox(
+        f"Bauer optimal underhung arm (Eq.22)  D = {D_eq22:.2f} mm, β = 0°",
+        key="show_eq22",
+        help="Bauer Eq.22 optimal underhung arm — negative overhang, β=0. "
+             "Y-axis rescales automatically when toggled."
+    )
 
     st.markdown("---")
     st.markdown("### Skating force (Tab 3)")
