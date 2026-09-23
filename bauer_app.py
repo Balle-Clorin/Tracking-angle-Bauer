@@ -337,10 +337,15 @@ with st.sidebar:
     if show_ref:
         ref_D, ref_beta, ref_N1, ref_N2 = solve_alignment(ref_choice, L, R_INNER, R_OUTER)
         ref_color = REF_COLORS[ref_choice]
+        if arm_input_mode == "Effective length  l":
+            ref_companion = f"pivot-to-spindle d = {L - ref_D:.2f} mm"
+        else:
+            ref_companion = f"effective length l = {d_input + ref_D:.2f} mm"
         st.success(
             f"**{ref_choice}**\n\n"
             f"N1 = {ref_N1:.2f} mm  ·  N2 = {ref_N2:.2f} mm\n\n"
-            f"D = {ref_D:.3f} mm  ·  β = {ref_beta:.3f}°"
+            f"D = {ref_D:.3f} mm  ·  β = {ref_beta:.3f}°\n\n"
+            f"{ref_companion}"
         )
 
     if "show_eq22" not in st.session_state:
