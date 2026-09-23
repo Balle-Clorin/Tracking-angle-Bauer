@@ -885,8 +885,10 @@ with tab3:
     st.caption(
         f"**Radial force** µ·Fv·tan(φ): force directed toward the spindle along the groove radius (Bauer p.112).  "
         f"**Tonearm arc force** µ·Fv·sin(φ): component perpendicular to the tonearm — "
-        f"this is the side force that drives the arm inward along its pivot arc.  "
-        f"For typical offset angles (20–25°) the difference between tan and sin is can be shown, as you can choose to plot both.  "
+        f"the side force that drives the arm inward along its pivot arc.  "
+        f"For overhung arms (φ ≈ 20–25°) tan and sin differ by ~8–10%, clearly visible when both are plotted.  "
+        f"For underhung arms (φ ≈ −6° to +13°) the angles are small so tan and sin differ by less than 2.5% — "
+        f"the two curves nearly overlap, which is physically correct.  "
         f"µ = {MU:.2f}."
     )
 
