@@ -409,15 +409,20 @@ if show_eq22:
 
 omega_r  = 2 * np.pi * RPM / 60.0
 
+# ── Skating force component flags (needed by ref_kw and tab 3) ───────────────
+show_radial = skate_mode in ("Radial  (tan φ)", "Both")
+show_arc    = skate_mode in ("Tonearm arc  (sin φ)", "Both")
+
 # ── Reference alignment trace kwargs ─────────────────────────────────────────
 if show_ref:
     ref_kw = dict(
         show=True, L=L, r_arr=r_arr,
         D=ref_D, beta_deg=ref_beta, color=ref_color, name=ref_choice,
         MU=MU, V_MOD=V_MOD, omega_r=omega_r,
+        show_radial=show_radial, show_arc=show_arc,
     )
 else:
-    ref_kw = dict(show=False)
+    ref_kw = dict(show=False, show_radial=show_radial, show_arc=show_arc)
 
 def add_ref_trace(fig, mode, kw):
     if not kw.get("show"):
@@ -436,9 +441,27 @@ def add_ref_trace(fig, mode, kw):
         y  = np.degrees(phi - br)
         ht = "r = %{x:.1f} mm<br>α = %{y:.3f}°<extra></extra>"
     elif mode == "skating":
-        # Reference curve always shows radial force µ·tan(φ)
-        y  = kw["MU"] * np.tan(phi) * 100.0
-        ht = "r = %{x:.1f} mm<br>µ·tan(φ) = %{y:.3f}%<extra></extra>"
+        show_radial = kw.get("show_radial", True)
+        show_arc    = kw.get("show_arc", False)
+        if show_radial:
+            y  = kw["MU"] * np.tan(phi) * 100.0
+            ht = "r = %{x:.1f} mm<br>µ·tan(φ) = %{y:.3f}%<extra></extra>"
+            lbl = f"{nm}<br>D={D_:.2f}mm  β={kw['beta_deg']:.2f}°" + ("  · tan(φ)" if show_arc else "")
+            fig.add_trace(go.Scatter(
+                x=r, y=y, name=lbl,
+                line=dict(color=col, width=2.5, dash="dashdot"),
+                hovertemplate=ht,
+            ))
+        if show_arc:
+            y  = kw["MU"] * np.sin(phi) * 100.0
+            ht = "r = %{x:.1f} mm<br>µ·sin(φ) = %{y:.3f}%<extra></extra>"
+            lbl = f"{nm}<br>D={D_:.2f}mm  β={kw['beta_deg']:.2f}°" + ("  · sin(φ)" if show_radial else "")
+            fig.add_trace(go.Scatter(
+                x=r, y=y, name=lbl,
+                line=dict(color=col, width=1.2, dash="dashdot"),
+                hovertemplate=ht,
+            ))
+        return
     elif mode == "distortion":
         y  = distortion_pct(r, L_, D_, br, kw["V_MOD"], kw["omega_r"])
         ht = "r = %{x:.1f} mm<br>HD2 = %{y:.3f}%<extra></extra>"
@@ -807,9 +830,6 @@ with tab2:
 
 with tab3:
     fig2 = go.Figure()
-
-    show_radial = skate_mode in ("Radial  (tan φ)", "Both")
-    show_arc    = skate_mode in ("Tonearm arc  (sin φ)", "Both")
 
     for cfg in OVERHANGS:
         phi_arr = tracking_angle_exact(r_arr, L, cfg["D"])
