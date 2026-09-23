@@ -361,12 +361,15 @@ with st.sidebar:
     MU = st.number_input("Friction coefficient  µ", 0.10, 0.80,
                          step=0.01, format="%.2f", key="MU",
                          help="Bauer typical ≈ 0.25; soft vinyl / heavy stylus → higher")
+    SKATE_OPTIONS = ["Radial  (tan φ)", "Tonearm arc  (sin φ)", "Both"]
+    if "skate_mode" not in st.session_state:
+        st.session_state["skate_mode"] = "Radial  (tan φ)"
     skate_mode = st.radio(
         "Show skating force component",
-        ["Radial  µ·tan(φ)", "Tonearm arc  µ·sin(φ)", "Both"],
+        SKATE_OPTIONS,
         key="skate_mode",
-        help="Radial µ·tan(φ): force directed toward spindle along groove radius (Bauer p.112).  "
-             "Tonearm arc µ·sin(φ): side force perpendicular to the arm — "
+        help="Radial tan(φ): force directed toward spindle along groove radius (Bauer p.112).  "
+             "Tonearm arc sin(φ): side force perpendicular to the arm — "
              "this is what actually drives the arm inward along its arc.",
     )
 
@@ -805,32 +808,30 @@ with tab2:
 with tab3:
     fig2 = go.Figure()
 
-    show_radial = skate_mode in ("Radial  µ·tan(φ)", "Both")
-    show_arc    = skate_mode in ("Tonearm arc  µ·sin(φ)", "Both")
+    show_radial = skate_mode in ("Radial  (tan φ)", "Both")
+    show_arc    = skate_mode in ("Tonearm arc  (sin φ)", "Both")
 
     for cfg in OVERHANGS:
         phi_arr = tracking_angle_exact(r_arr, L, cfg["D"])
-        lw   = 2.2 if cfg.get("eq22") else 1.8
-        dash = "dash" if cfg.get("eq22") else "solid"
+        is_eq22 = cfg.get("eq22")
+        dash = "dash" if is_eq22 else "solid"
         col  = cfg["color"]
 
         if show_radial:
             fr_radial = MU * np.tan(phi_arr) * 100.0
-            name_r = cfg["label"] + ("  [tan]" if show_arc else "")
+            name_r = cfg["label"] + ("  · tan(φ)" if show_arc else "")
             fig2.add_trace(go.Scatter(
                 x=r_arr, y=fr_radial, name=name_r,
-                line=dict(color=col, width=lw, dash=dash),
+                line=dict(color=col, width=2.5, dash=dash),
                 hovertemplate="r = %{x:.1f} mm<br>µ·tan(φ) = %{y:.3f} %<extra></extra>",
             ))
 
         if show_arc:
             fr_arc = MU * np.sin(phi_arr) * 100.0
-            name_a = cfg["label"] + ("  [sin]" if show_radial else "")
-            # Slightly lighter/dotted when shown alongside radial
-            dash_a = "dot" if show_radial else dash
+            name_a = cfg["label"] + ("  · sin(φ)" if show_radial else "")
             fig2.add_trace(go.Scatter(
                 x=r_arr, y=fr_arc, name=name_a,
-                line=dict(color=col, width=lw, dash=dash_a),
+                line=dict(color=col, width=1.2, dash=dash),
                 hovertemplate="r = %{x:.1f} mm<br>µ·sin(φ) = %{y:.3f} %<extra></extra>",
             ))
 
