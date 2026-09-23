@@ -190,14 +190,16 @@ def solve_alignment(name, l, R1, R2):
 LAYOUT_BASE = dict(
     paper_bgcolor="#1a1d23",
     plot_bgcolor="#12151a",
-    font=dict(family="IBM Plex Mono, monospace", color="#8a919e", size=11),
-    xaxis=dict(gridcolor="#22262e", zerolinecolor="#32373f", tickcolor="#8a919e"),
-    yaxis=dict(gridcolor="#22262e", zerolinecolor="#32373f", tickcolor="#8a919e"),
+    font=dict(family="IBM Plex Mono, monospace", color="#ffffff", size=13),
+    xaxis=dict(gridcolor="#22262e", zerolinecolor="#32373f",
+               tickcolor="#ffffff", tickfont=dict(color="#ffffff", size=14)),
+    yaxis=dict(gridcolor="#22262e", zerolinecolor="#32373f",
+               tickcolor="#ffffff", tickfont=dict(color="#ffffff", size=14)),
 )
 
 LEGEND_BASE = dict(
     bgcolor="#22262e", bordercolor="#32373f", borderwidth=1,
-    font=dict(color="#dce1e9", size=10),
+    font=dict(color="#ffffff", size=14),
 )
 
 def vline(x, color="#32373f"):
@@ -562,12 +564,12 @@ with tab1:
                 x=0, y=-abs(DIAG_D), ax=0, ay=0,
                 axref="x", ayref="y", xref="x", yref="y",
                 arrowhead=2, arrowsize=1, arrowwidth=1.5,
-                arrowcolor="#8fc99b", showarrow=True)
+                arrowcolor="#6db87a", showarrow=True)
             sign = "+" if DIAG_D >= 0 else ""
             fig_geo.add_annotation(
                 x=8, y=-abs(DIAG_D)/2,
                 text=f"D={sign}{DIAG_D:.1f} mm",
-                showarrow=False, font=dict(color="#8fc99b", size=10))
+                showarrow=False, font=dict(color="#6db87a", size=14))
 
         # Points: O, P, stylus
         fig_geo.add_trace(go.Scatter(
@@ -577,14 +579,14 @@ with tab1:
                         size=[8, 10, 8]),
             text=["O", "P (pivot)", "stylus"],
             textposition=["top right", "top right", "bottom right"],
-            textfont=dict(color="#8a919e", size=9),
+            textfont=dict(color="#ffffff", size=14),
             showlegend=False))
 
         # Labels: d, l, r
         mid_d = pivot_geo * 0.45
         fig_geo.add_annotation(x=mid_d[0]+8, y=mid_d[1],
             text=f"d={d_pivot:.0f} mm", showarrow=False,
-            font=dict(color="#6a8090", size=9))
+            font=dict(color="#ffffff", size=14))
         arm_mid = (pivot_geo + needle_geo) / 2
         arm_perp = np.array([-( needle_geo[1]-pivot_geo[1]),
                                needle_geo[0]-pivot_geo[0]])
@@ -592,35 +594,35 @@ with tab1:
         lp = arm_mid + arm_perp * 12
         fig_geo.add_annotation(x=lp[0], y=lp[1],
             text=f"l={L:.0f} mm", showarrow=False,
-            font=dict(color=DIAG_color, size=9))
+            font=dict(color=DIAG_color, size=14))
         rp = needle_geo * 0.48
         fig_geo.add_annotation(x=rp[0]-8, y=rp[1]-6,
             text=f"r={r_diag:.0f} mm", showarrow=False,
-            font=dict(color="#5a7080", size=9))
+            font=dict(color="#ffffff", size=14))
         # φ label on arc
         mid_arc = np.radians((a1_arc + a2_arc) / 2)
         fig_geo.add_annotation(
             x=needle_geo[0] + 32*np.cos(mid_arc),
             y=needle_geo[1] + 32*np.sin(mid_arc),
             text=f"φ={phi_diag_deg:.1f}°", showarrow=False,
-            font=dict(color="#c96e85", size=10))
+            font=dict(color="#c96e85", size=14))
 
         all_x = [0, px, needle_geo[0]]
         all_y = [0, py, needle_geo[1], -abs(DIAG_D)-10]
         pad = 35
         fig_geo.update_layout(
             paper_bgcolor="#1a1d23", plot_bgcolor="#12151a",
-            font=dict(family="IBM Plex Mono, monospace", color="#8a919e", size=11),
+            font=dict(family="IBM Plex Mono, monospace", color="#ffffff", size=13),
             title=dict(
                 text=f"Fig. 1(a) — Pivot / record / needle geometry<br>"
                      f"<sup>D={DIAG_D:+.1f} mm · r={r_diag:.0f} mm · l={L:.0f} mm</sup>",
-                font=dict(color="#dce1e9", size=11)),
+                font=dict(color="#ffffff", size=13)),
             xaxis=dict(title="mm", gridcolor="#22262e", zerolinecolor="#32373f",
-                       tickcolor="#8a919e",
+                       tickcolor="#ffffff",
                        range=[min(all_x)-pad, max(all_x)+pad],
                        scaleanchor="y", scaleratio=1),
             yaxis=dict(title="mm", gridcolor="#22262e", zerolinecolor="#32373f",
-                       tickcolor="#8a919e",
+                       tickcolor="#ffffff",
                        range=[min(all_y)-pad, max(all_y)+pad]),
             height=480,
             margin=dict(l=50, r=10, t=70, b=50),
@@ -646,7 +648,7 @@ with tab1:
         fig1.update_layout(
             **LAYOUT_BASE,
             title=dict(text="Fig. 1(b) — Tracking angle φ vs groove radius  [Bauer Eq. 4, exact]",
-                       font=dict(color="#dce1e9", size=11)),
+                       font=dict(color="#ffffff", size=13)),
             xaxis_title="Groove radius  r  (mm)",
             yaxis_title="Tracking angle  φ  (degrees)",
             shapes=[vline(R_INNER), vline(R_OUTER), hline(0)],
@@ -752,7 +754,7 @@ with tab2:
         **LAYOUT_BASE,
         title=dict(
             text="Tracking error  α = φ − β   [Bauer Eq. 4 exact]",
-            font=dict(color="#dce1e9", size=12)),
+            font=dict(color="#ffffff", size=14)),
         xaxis_title="Groove radius  r  (mm)",
         yaxis_title="Tracking error  α  (degrees)",
         yaxis_range=[y_lo, y_hi],
@@ -847,7 +849,7 @@ with tab3:
 
     fig2.update_layout(
         **LAYOUT_BASE,
-        title=dict(text=title_txt, font=dict(color="#dce1e9", size=12)),
+        title=dict(text=title_txt, font=dict(color="#ffffff", size=14)),
         xaxis_title="Groove radius  r  (mm)",
         yaxis_title=yaxis_lbl,
         shapes=[vline(R_INNER), vline(R_OUTER), hline(0)],
@@ -878,7 +880,7 @@ with tab4:
     fig3.add_hline(y=2.2, line=dict(color="#ffffff", width=0.8, dash="dot"),
                    opacity=0.3,
                    annotation_text="2.2 % (Bauer ref, straight arm)",
-                   annotation_font=dict(color="#8a919e", size=9),
+                   annotation_font=dict(color="#ffffff", size=14),
                    annotation_position="bottom right")
 
     for cfg in OVERHANGS:
@@ -913,7 +915,7 @@ with tab4:
         title=dict(
             text=f"2nd-order distortion  [Bauer Eq. 16, velocity basis]   "
                  f"ωA = {V_MOD:.0f} mm/s  ·  {RPM:.2f} rpm",
-            font=dict(color="#dce1e9", size=12)),
+            font=dict(color="#ffffff", size=14)),
         xaxis_title="Groove radius  r  (mm)",
         yaxis_title="2nd harmonic distortion  (%)",
         shapes=[vline(R_INNER), vline(R_OUTER)],
