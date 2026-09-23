@@ -264,17 +264,15 @@ with st.sidebar:
             st.session_state["L"] = 233.15
         L = st.number_input("Effective length  l  (mm)", 150.0, 400.0,
                             step=0.01, format="%.2f", key="L")
-        # Compute d from first overhang curve for display
         D0 = st.session_state.overhangs[0][0] \
              if st.session_state.get("overhangs") else 17.8
-        d_spindle = L - D0
-        st.caption(f"Pivot-to-spindle  d = l − D₁ = {d_spindle:.2f} mm")
+        d_input = L - D0
+        st.caption(f"Pivot-to-spindle  d = l − D₁ = {d_input:.2f} mm")
     else:
         if "d_spindle" not in st.session_state:
-            st.session_state["d_spindle"] = 215.36   # SME V default
+            st.session_state["d_spindle"] = 215.36
         d_input = st.number_input("Pivot-to-spindle distance  d  (mm)", 100.0, 380.0,
                                   step=0.01, format="%.2f", key="d_spindle")
-        # l = d + D  — use first overhang curve's D
         D0 = st.session_state.overhangs[0][0] \
              if st.session_state.get("overhangs") else 17.8
         L = d_input + D0
@@ -347,8 +345,13 @@ with st.sidebar:
 
     if "show_eq22" not in st.session_state:
         st.session_state["show_eq22"] = False
+    # Companion value: show d when user entered l, or show l when user entered d
+    if arm_input_mode == "Effective length  l":
+        eq22_companion = f"pivot-to-spindle d = {L - D_eq22:.2f} mm"
+    else:
+        eq22_companion = f"effective length l = {d_input + D_eq22:.2f} mm"
     show_eq22 = st.checkbox(
-        f"Bauer optimal underhung arm (Eq.22)  D = {D_eq22:.2f} mm, β = 0°",
+        f"Bauer optimal underhung arm (Eq.22)  D = {D_eq22:.2f} mm,  β = 0°  →  {eq22_companion}",
         key="show_eq22",
         help="Bauer Eq.22 optimal underhung arm — negative overhang, β=0. "
              "Y-axis rescales automatically when toggled."
