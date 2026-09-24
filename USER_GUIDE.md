@@ -89,7 +89,34 @@ When a standard alignment is ticked, a green info box shows:
   - **Tonearm arc sin(φ)** — the force component perpendicular to the arm, which actually drives the arm inward along its pivot arc
   - **Both** — plots both on the same chart: tan(φ) as thick lines, sin(φ) as thin lines, same colour per curve
 
-For overhung arms (φ ≈ 20–25°) the difference between tan and sin is about 8–10%. For underhung arms the tracking angle φ is small, so tan and sin are nearly identical — this is physically correct.
+#### The physics of skating force — two different formulations
+
+The diagram below (from a German physics tutorial) shows why there are two different ways to express the skating force, and why they give slightly different results:
+
+![Skating force diagram](skating_force_diagram.png)
+
+**Left diagram — Tonearm side force (Tonarm-Seitenkraft):**
+The friction force F_R acts along the groove tangent at angle α (the combined offset + tracking error angle) to the arm axis. Decomposing F_R into components along and perpendicular to the arm gives the side force:
+
+> **F_S = F_A · µ_R · sin(α)**
+
+where F_A is the vertical tracking force (Auflagekraft) and µ_R is the groove friction coefficient (Rillen-Reibwert). This is the force that drives the arm inward along its pivot arc.
+
+**Right diagram — Groove radial force (Rillen-Seitenkraft):**
+Looking at the same geometry differently, the radial component of the friction force (pointing toward the spindle) is:
+
+> **F_S\* = F_A · µ_R · tan(α)**
+
+and the tonearm side force relates to this as F_S = F_S\* · cos(α).
+
+**In this app**, the angle used is the tracking angle φ (not the tracking error α), following Bauer's treatment:
+- **Radial force:** µ · tan(φ) × 100% of VTF
+- **Tonearm arc force:** µ · sin(φ) × 100% of VTF
+
+For typical overhung arms (φ ≈ 20–25°) the difference between tan and sin is about 8–10%. For underhung arms the tracking angle φ is small, so tan and sin are nearly identical — this is physically correct.
+
+📺 **Excellent video explanation (German, with clear visuals):**
+[Das verflixte Anti-Skating am Plattenspieler! — messen, berechnen, bauen, einstellen](https://www.youtube.com/watch?v=_Wo7G8mxcXQ&t=60s)
 
 ---
 
