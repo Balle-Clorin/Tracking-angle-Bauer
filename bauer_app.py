@@ -329,28 +329,36 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("### Standard alignment (optional)")
-    st.caption("Adds a reference curve to all tabs — Löfgren / Baerwald / Stevenson")
-    REF_NAMES = ["— none —", "Löfgren A", "Löfgren B", "Stevenson"]
-    REF_COLORS = {"Löfgren A": "#f0c040", "Löfgren B": "#7ec8a0", "Stevenson": "#c07ef0"}
-    ref_choice = st.selectbox("Alignment", REF_NAMES, key="ref_alignment")
-    show_ref   = ref_choice != "— none —"
-    if show_ref:
-        ref_D, ref_beta, ref_N1, ref_N2 = solve_alignment(ref_choice, L, R_INNER, R_OUTER)
-        ref_color = REF_COLORS[ref_choice]
-        if arm_input_mode == "Effective length  l":
-            ref_companion = f"pivot-to-spindle d = {L - ref_D:.2f} mm"
-        else:
-            ref_companion = f"effective length l = {d_input + ref_D:.2f} mm"
-        st.success(
-            f"**{ref_choice}**\n\n"
-            f"N1 = {ref_N1:.2f} mm  ·  N2 = {ref_N2:.2f} mm\n\n"
-            f"D = {ref_D:.3f} mm  ·  β = {ref_beta:.3f}°\n\n"
-            f"{ref_companion}"
-        )
+    st.caption("Toggle each alignment — shown as dashed reference curves on all tabs")
+
+    REF_COLORS = {
+        "Löfgren A": "#f0c040",
+        "Löfgren B": "#7ec8a0",
+        "Stevenson": "#c07ef0",
+    }
+
+    REF_CURVES = []
+    for aname, acol in REF_COLORS.items():
+        key = f"show_{aname.replace(' ', '_')}"
+        if key not in st.session_state:
+            st.session_state[key] = False
+        if st.checkbox(aname, key=key):
+            aD, abeta, aN1, aN2 = solve_alignment(aname, L, R_INNER, R_OUTER)
+            if arm_input_mode == "Effective length  l":
+                companion = f"pivot-to-spindle d = {L - aD:.2f} mm"
+            else:
+                companion = f"effective length l = {d_input + aD:.2f} mm"
+            st.success(
+                f"**{aname}**\n\n"
+                f"N1 = {aN1:.2f} mm  ·  N2 = {aN2:.2f} mm\n\n"
+                f"D = {aD:.3f} mm  ·  β = {abeta:.3f}°\n\n"
+                f"{companion}"
+            )
+            REF_CURVES.append({"name": aname, "D": aD, "beta": abeta,
+                                "N1": aN1, "N2": aN2, "color": acol})
 
     if "show_eq22" not in st.session_state:
         st.session_state["show_eq22"] = False
-    # Companion value: show d when user entered l, or show l when user entered d
     if arm_input_mode == "Effective length  l":
         eq22_companion = f"pivot-to-spindle d = {L - D_eq22:.2f} mm"
     else:
@@ -405,80 +413,67 @@ OVERHANGS = [
      "color": COLORS[i % len(COLORS)]}
     for i, (D, beta) in enumerate(OVERHANG_VALUES)
 ]
-# Eq.22 appended only when toggled on
-if show_eq22:
-    eq22_color = COLORS[len(OVERHANGS) % len(COLORS)]
-    OVERHANGS.append({
-        "D": D_eq22, "beta": 0.0,
-        "label": f"D = {D_eq22:.2f} mm  (Eq.22 optimal underhung, β=0)",
-        "color": eq22_color,
-        "eq22": True,
-    })
 
 omega_r  = 2 * np.pi * RPM / 60.0
 
-# ── Skating force component flags (needed by ref_kw and tab 3) ───────────────
+# ── Skating force component flags ─────────────────────────────────────────────
 show_radial = skate_mode in ("Radial  (tan φ)", "Both")
 show_arc    = skate_mode in ("Tonearm arc  (sin φ)", "Both")
 
-# ── Reference alignment trace kwargs ─────────────────────────────────────────
-if show_ref:
-    ref_kw = dict(
-        show=True, L=L, r_arr=r_arr,
-        D=ref_D, beta_deg=ref_beta, color=ref_color, name=ref_choice,
-        MU=MU, V_MOD=V_MOD, omega_r=omega_r,
-        show_radial=show_radial, show_arc=show_arc,
-    )
-else:
-    ref_kw = dict(show=False, show_radial=show_radial, show_arc=show_arc)
+# ── Add Eq.22 to REF_CURVES if toggled ───────────────────────────────────────
+if show_eq22:
+    REF_CURVES.append({"name": "Eq.22 underhung", "D": D_eq22, "beta": 0.0,
+                        "N1": None, "N2": None,
+                        "color": COLORS[len(OVERHANGS) % len(COLORS)]})
 
-def add_ref_trace(fig, mode, kw):
-    if not kw.get("show"):
-        return
-    r   = kw["r_arr"]
-    L_  = kw["L"]
-    D_  = kw["D"]
-    br  = np.radians(kw["beta_deg"])
-    col = kw["color"]
-    nm  = kw["name"]
-    phi = tracking_angle_exact(r, L_, D_)
-    if mode == "phi":
-        y  = np.degrees(phi)
-        ht = "r = %{x:.1f} mm<br>φ = %{y:.3f}°<extra></extra>"
-    elif mode == "alpha":
-        y  = np.degrees(phi - br)
-        ht = "r = %{x:.1f} mm<br>α = %{y:.3f}°<extra></extra>"
-    elif mode == "skating":
-        show_radial = kw.get("show_radial", True)
-        show_arc    = kw.get("show_arc", False)
-        if show_radial:
-            y  = kw["MU"] * np.tan(phi) * 100.0
-            ht = "r = %{x:.1f} mm<br>µ·tan(φ) = %{y:.3f}%<extra></extra>"
-            lbl = f"{nm}<br>D={D_:.2f}mm  β={kw['beta_deg']:.2f}°" + ("  · tan(φ)" if show_arc else "")
+def add_ref_traces(fig, mode):
+    """Add all active reference alignment curves to fig."""
+    for rc in REF_CURVES:
+        D_   = rc["D"]
+        br   = np.radians(rc["beta"])
+        col  = rc["color"]
+        nm   = rc["name"]
+        phi  = tracking_angle_exact(r_arr, L, D_)
+        lbl_base = f"{nm}<br>D={D_:.2f}mm  β={rc['beta']:.2f}°"
+
+        if mode == "phi":
             fig.add_trace(go.Scatter(
-                x=r, y=y, name=lbl,
-                line=dict(color=col, width=2.5, dash="dashdot"),
-                hovertemplate=ht,
+                x=r_arr, y=np.degrees(phi), name=lbl_base,
+                line=dict(color=col, width=2.0, dash="dashdot"),
+                hovertemplate="r = %{x:.1f} mm<br>φ = %{y:.3f}°<extra></extra>",
             ))
-        if show_arc:
-            y  = kw["MU"] * np.sin(phi) * 100.0
-            ht = "r = %{x:.1f} mm<br>µ·sin(φ) = %{y:.3f}%<extra></extra>"
-            lbl = f"{nm}<br>D={D_:.2f}mm  β={kw['beta_deg']:.2f}°" + ("  · sin(φ)" if show_radial else "")
+
+        elif mode == "alpha":
             fig.add_trace(go.Scatter(
-                x=r, y=y, name=lbl,
-                line=dict(color=col, width=1.2, dash="dashdot"),
-                hovertemplate=ht,
+                x=r_arr, y=np.degrees(phi - br), name=lbl_base,
+                line=dict(color=col, width=2.0, dash="dashdot"),
+                hovertemplate="r = %{x:.1f} mm<br>α = %{y:.3f}°<extra></extra>",
             ))
-        return
-    elif mode == "distortion":
-        y  = distortion_pct(r, L_, D_, br, kw["V_MOD"], kw["omega_r"])
-        ht = "r = %{x:.1f} mm<br>HD2 = %{y:.3f}%<extra></extra>"
-    lbl = f"{nm}<br>D={D_:.2f}mm  β={kw['beta_deg']:.2f}°"
-    fig.add_trace(go.Scatter(
-        x=r, y=y, name=lbl,
-        line=dict(color=col, width=2.0, dash="dashdot"),
-        hovertemplate=ht,
-    ))
+
+        elif mode == "skating":
+            if show_radial:
+                lbl = lbl_base + ("  · tan(φ)" if show_arc else "")
+                fig.add_trace(go.Scatter(
+                    x=r_arr, y=MU * np.tan(phi) * 100.0, name=lbl,
+                    line=dict(color=col, width=2.5, dash="dashdot"),
+                    hovertemplate="r = %{x:.1f} mm<br>µ·tan(φ) = %{y:.3f}%<extra></extra>",
+                ))
+            if show_arc:
+                lbl = lbl_base + ("  · sin(φ)" if show_radial else "")
+                fig.add_trace(go.Scatter(
+                    x=r_arr, y=MU * np.sin(phi) * 100.0, name=lbl,
+                    line=dict(color=col, width=1.2, dash="dashdot"),
+                    hovertemplate="r = %{x:.1f} mm<br>µ·sin(φ) = %{y:.3f}%<extra></extra>",
+                ))
+
+        elif mode == "distortion":
+            fig.add_trace(go.Scatter(
+                x=r_arr,
+                y=distortion_pct(r_arr, L, D_, br, V_MOD, omega_r),
+                name=lbl_base,
+                line=dict(color=col, width=2.0, dash="dashdot"),
+                hovertemplate="r = %{x:.1f} mm<br>HD2 = %{y:.3f}%<extra></extra>",
+            ))
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # HEADER
@@ -678,7 +673,7 @@ with tab1:
                 hovertemplate="r = %{x:.1f} mm<br>φ = %{y:.3f}°<extra></extra>",
             ))
 
-        add_ref_trace(fig1, "phi", ref_kw)
+        add_ref_traces(fig1, "phi")
         fig1.update_layout(
             **LAYOUT_BASE,
             title=dict(text="Fig. 1(b) — Tracking angle φ vs groove radius  [Bauer Eq. 4, exact]",
@@ -783,7 +778,7 @@ with tab2:
                               line=dict(color=cfg["color"], width=1, dash="dot"),
                               opacity=0.6)
 
-    add_ref_trace(fig_err, "alpha", ref_kw)
+    add_ref_traces(fig_err, "alpha")
     fig_err.update_layout(
         **LAYOUT_BASE,
         title=dict(
@@ -863,7 +858,7 @@ with tab3:
                 hovertemplate="r = %{x:.1f} mm<br>µ·sin(φ) = %{y:.3f} %<extra></extra>",
             ))
 
-    add_ref_trace(fig2, "skating", ref_kw)
+    add_ref_traces(fig2, "skating")
 
     # Build title and y-axis label from mode
     if show_radial and show_arc:
@@ -934,7 +929,7 @@ with tab4:
             fig3.add_vline(x=z, line=dict(color=cfg["color"], width=0.8, dash="dot"),
                            opacity=0.5)
 
-    add_ref_trace(fig3, "distortion", ref_kw)
+    add_ref_traces(fig3, "distortion")
     fig3.update_layout(
         **LAYOUT_BASE,
         title=dict(
