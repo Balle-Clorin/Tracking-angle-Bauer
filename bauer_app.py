@@ -394,19 +394,15 @@ with st.sidebar:
 
             col_pd, col_pb = st.columns(2)
             with col_pd:
-                _key = "new_curve_D"
-                if _key not in st.session_state or add_preset != st.session_state.get("_last_preset"):
-                    st.session_state[_key] = round(float(_D), 2)
-                    st.session_state["_last_preset"] = add_preset
                 new_D_add = st.number_input("D (mm)", -60.0, 100.0,
-                                            step=0.01, format="%.2f", key=_key)
+                                            value=round(float(_D), 2),
+                                            step=0.01, format="%.2f",
+                                            key=f"new_curve_D_{add_preset}_{L_new:.0f}")
             with col_pb:
-                _key2 = "new_curve_b"
-                if _key2 not in st.session_state or add_preset != st.session_state.get("_last_preset_b"):
-                    st.session_state[_key2] = round(float(_b), 2)
-                    st.session_state["_last_preset_b"] = add_preset
                 new_b_add = st.number_input("β (°)", 0.0, 35.0,
-                                            step=0.01, format="%.2f", key=_key2)
+                                            value=round(float(_b), 2),
+                                            step=0.01, format="%.2f",
+                                            key=f"new_curve_b_{add_preset}_{L_new:.0f}")
 
             st.caption(f"Will add: l = {L_new:.2f} mm  ·  D = {new_D_add:.2f} mm  ·  β = {new_b_add:.2f}°")
 
