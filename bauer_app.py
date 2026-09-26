@@ -442,6 +442,7 @@ with st.sidebar:
                 f"{companion}"
             )
             REF_CURVES.append({"name": aname, "D": aD, "beta": abeta,
+                                "L": L,
                                 "N1": aN1, "N2": aN2, "color": acol})
 
     if "show_eq22" not in st.session_state:
@@ -500,7 +501,7 @@ r_arr = np.linspace(R_INNER, R_OUTER, N)
 OVERHANG_VALUES = st.session_state.overhangs
 OVERHANGS = [
     {"D": D, "beta": beta, "L": L_c,
-     "label": f"{make_label(D)}  β={beta:.2f}°  l={L_c:.0f}mm",
+     "label": f"l={L_c:.0f}mm  {make_label(D)}  β={beta:.2f}°",
      "color": COLORS[i % len(COLORS)]}
     for i, (D, beta, L_c) in enumerate(OVERHANG_VALUES)
 ]
@@ -514,6 +515,7 @@ show_arc    = skate_mode in ("Tonearm arc  (sin φ)", "Both")
 # ── Add Eq.22 to REF_CURVES if toggled ───────────────────────────────────────
 if show_eq22:
     REF_CURVES.append({"name": "Eq.22 underhung", "D": D_eq22, "beta": 0.0,
+                        "L": L,
                         "N1": None, "N2": None,
                         "color": COLORS[len(OVERHANGS) % len(COLORS)]})
 
@@ -521,11 +523,12 @@ def add_ref_traces(fig, mode):
     """Add all active reference alignment curves to fig."""
     for rc in REF_CURVES:
         D_   = rc["D"]
+        L_   = rc.get("L", L)
         br   = np.radians(rc["beta"])
         col  = rc["color"]
         nm   = rc["name"]
-        phi  = tracking_angle_exact(r_arr, L, D_)
-        lbl_base = f"{nm}<br>D={D_:.2f}mm  β={rc['beta']:.2f}°"
+        phi  = tracking_angle_exact(r_arr, L_, D_)
+        lbl_base = f"{nm}<br>l={L_:.0f}mm  D={D_:.2f}mm  β={rc['beta']:.2f}°"
 
         if mode == "phi":
             fig.add_trace(go.Scatter(
@@ -560,7 +563,7 @@ def add_ref_traces(fig, mode):
         elif mode == "distortion":
             fig.add_trace(go.Scatter(
                 x=r_arr,
-                y=distortion_pct(r_arr, L, D_, br, V_MOD, omega_r),
+                y=distortion_pct(r_arr, L_, D_, br, V_MOD, omega_r),
                 name=lbl_base,
                 line=dict(color=col, width=2.0, dash="dashdot"),
                 hovertemplate="r = %{x:.1f} mm<br>HD2 = %{y:.3f}%<extra></extra>",
