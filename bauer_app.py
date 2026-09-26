@@ -321,11 +321,64 @@ with st.sidebar:
         st.session_state.overhangs.pop(to_remove)
         st.rerun()
 
-    if st.button("＋ Add curve") and len(st.session_state.overhangs) < 4:
-        st.session_state.overhangs.append((17.8, 23.63))
-        st.rerun()
-
     D_eq22 = eq22_D(L, R_INNER, R_OUTER)
+
+    # ── Add curve panel ───────────────────────────────────────────────────────
+    if len(st.session_state.overhangs) < 4:
+        with st.expander("＋ Add curve", expanded=False):
+            st.caption("Choose a starting point for the new curve:")
+
+            # Build preset options from current arm length
+            def _al(name):
+                aD, ab, _, _ = solve_alignment(name, L, R_INNER, R_OUTER)
+                return aD, ab
+
+            add_preset = st.radio(
+                "Starting point",
+                [
+                    "Löfgren A  (optimal for this arm)",
+                    "Löfgren B  (optimal for this arm)",
+                    "Stevenson  (optimal for this arm)",
+                    f"Bauer Eq.22 underhung  (D={D_eq22:.2f} mm, β=0°)",
+                    "Current arm values  (D & β from curve 1)",
+                    "Custom — enter manually",
+                ],
+                key="add_preset_choice",
+            )
+
+            if add_preset.startswith("Löfgren A"):
+                _D, _b = _al("Löfgren A")
+            elif add_preset.startswith("Löfgren B"):
+                _D, _b = _al("Löfgren B")
+            elif add_preset.startswith("Stevenson"):
+                _D, _b = _al("Stevenson")
+            elif add_preset.startswith("Bauer Eq.22"):
+                _D, _b = D_eq22, 0.0
+            elif add_preset.startswith("Current"):
+                _D, _b = st.session_state.overhangs[0] if st.session_state.overhangs else (17.8, 23.63)
+            else:
+                _D, _b = 17.8, 23.63
+
+            # Show editable D and β (user can fine-tune before adding)
+            col_pd, col_pb = st.columns(2)
+            with col_pd:
+                if "new_curve_D" not in st.session_state or add_preset != st.session_state.get("_last_preset"):
+                    st.session_state["new_curve_D"] = round(float(_D), 2)
+                    st.session_state["_last_preset"] = add_preset
+                new_D_add = st.number_input("D (mm)", -60.0, 100.0,
+                                            step=0.01, format="%.2f",
+                                            key="new_curve_D")
+            with col_pb:
+                if "new_curve_b" not in st.session_state or add_preset != st.session_state.get("_last_preset_b"):
+                    st.session_state["new_curve_b"] = round(float(_b), 2)
+                    st.session_state["_last_preset_b"] = add_preset
+                new_b_add = st.number_input("β (°)", 0.0, 35.0,
+                                            step=0.01, format="%.2f",
+                                            key="new_curve_b")
+
+            if st.button("Add this curve", type="primary"):
+                st.session_state.overhangs.append((new_D_add, new_b_add))
+                st.rerun()
 
     st.markdown("---")
     st.markdown("### Standard alignment (optional)")
