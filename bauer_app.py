@@ -216,6 +216,10 @@ def hline(y, color="#32373f"):
 
 with st.sidebar:
     st.markdown("## 🎵 Bauer (1945)")
+    st.caption(
+        "📖 [User Guide](https://github.com/Balle-Clorin/tracking-angle-bauer/blob/main/USER_GUIDE.md)  ·  "
+        "Bauer, B.B. (1945). *Tracking Angle in Phonograph Pickups*. Electronics, March 1945."
+    )
     st.markdown("---")
 
     # ── Groove radii ─────────────────────────────────────────────────────────
@@ -483,12 +487,6 @@ with st.sidebar:
     if "RPM" not in st.session_state:
         st.session_state["RPM"] = 33.33
     RPM = st.selectbox("Record speed (rpm)", [33.33, 45.0, 78.0], key="RPM")
-
-    st.markdown("---")
-    st.caption(
-        "📖 [User Guide](https://github.com/Balle-Clorin/tracking-angle-bauer/blob/main/USER_GUIDE.md)  ·  "
-        "Bauer, B.B. (1945). *Tracking Angle in Phonograph Pickups*. Electronics, March 1945."
-    )
 
 # ── Build r_arr and OVERHANGS list ───────────────────────────────────────────
 
