@@ -192,9 +192,9 @@ LAYOUT_BASE = dict(
     plot_bgcolor="#12151a",
     font=dict(family="IBM Plex Mono, monospace", color="#ffffff", size=13),
     xaxis=dict(gridcolor="#22262e", zerolinecolor="#32373f",
-               tickcolor="#ffffff", tickfont=dict(color="#ffffff", size=14)),
+               tickcolor="#ffffff", tickfont=dict(color="#ffffff", size=21)),
     yaxis=dict(gridcolor="#22262e", zerolinecolor="#32373f",
-               tickcolor="#ffffff", tickfont=dict(color="#ffffff", size=14)),
+               tickcolor="#ffffff", tickfont=dict(color="#ffffff", size=21)),
 )
 
 LEGEND_BASE = dict(
