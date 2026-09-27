@@ -117,7 +117,7 @@ def _nulls_to_D_beta(N1, N2, l):
     D        = l - np.sqrt(l**2 - N1*N2)
     return D, beta_deg
 
-def solve_alignment(name, l, R1, R2):
+def solve_alignment(name, R1, R2, l=None, d=None):
     """
     Return (D_mm, beta_deg, N1_mm, N2_mm) for a named alignment.
 
@@ -181,8 +181,13 @@ def solve_alignment(name, l, R1, R2):
         N1 = R1
         N2 = (1+s) / ((1-s)/R1 + s2/R2)
 
+    if d is not None:
+        # Self-consistent effective length for this alignment: N1, N2 never depended on l
+        # above, so this is exact (not an approximation/iteration) - it guarantees
+        # l - D == d for the D this call returns, instead of using a stale/unrelated l.
+        l = np.sqrt(d**2 + N1 * N2)
     D, beta_deg = _nulls_to_D_beta(N1, N2, l)
-    return D, beta_deg, N1, N2
+    return D, beta_deg, N1, N2, l
 
 
 
@@ -343,11 +348,12 @@ with st.sidebar:
         if key not in st.session_state:
             st.session_state[key] = False
         if st.checkbox(aname, key=key):
-            aD, abeta, aN1, aN2 = solve_alignment(aname, L, R_INNER, R_OUTER)
             if arm_input_mode == "Effective length  l":
+                aD, abeta, aN1, aN2, aL = solve_alignment(aname, R_INNER, R_OUTER, l=L)
                 companion = f"pivot-to-spindle d = {L - aD:.2f} mm"
             else:
-                companion = f"effective length l = {d_input + aD:.2f} mm"
+                aD, abeta, aN1, aN2, aL = solve_alignment(aname, R_INNER, R_OUTER, d=d_input)
+                companion = f"effective length l = {aL:.2f} mm"   # now the L actually used, self-consistently
             st.success(
                 f"**{aname}**\n\n"
                 f"N1 = {aN1:.2f} mm  ·  N2 = {aN2:.2f} mm\n\n"
