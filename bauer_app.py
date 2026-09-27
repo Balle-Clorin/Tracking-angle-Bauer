@@ -200,6 +200,8 @@ LAYOUT_BASE = dict(
                tickcolor="#ffffff", tickfont=dict(color="#ffffff", size=14)),
     yaxis=dict(gridcolor="#22262e", zerolinecolor="#32373f",
                tickcolor="#ffffff", tickfont=dict(color="#ffffff", size=14)),
+    showlegend=True,  # Plotly hides the legend by default with only one trace
+                      # (e.g. no reference alignment toggled on) - force it on always.
 )
 
 LEGEND_BASE = dict(
