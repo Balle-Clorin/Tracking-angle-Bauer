@@ -190,14 +190,16 @@ def solve_alignment(name, l, R1, R2):
 LAYOUT_BASE = dict(
     paper_bgcolor="#1a1d23",
     plot_bgcolor="#12151a",
-    font=dict(family="IBM Plex Mono, monospace", color="#8a919e", size=11),
-    xaxis=dict(gridcolor="#22262e", zerolinecolor="#32373f", tickcolor="#8a919e"),
-    yaxis=dict(gridcolor="#22262e", zerolinecolor="#32373f", tickcolor="#8a919e"),
+    font=dict(family="IBM Plex Mono, monospace", color="#ffffff", size=13),
+    xaxis=dict(gridcolor="#22262e", zerolinecolor="#32373f",
+               tickcolor="#ffffff", tickfont=dict(color="#ffffff", size=21)),
+    yaxis=dict(gridcolor="#22262e", zerolinecolor="#32373f",
+               tickcolor="#ffffff", tickfont=dict(color="#ffffff", size=21)),
 )
 
 LEGEND_BASE = dict(
     bgcolor="#22262e", bordercolor="#32373f", borderwidth=1,
-    font=dict(color="#dce1e9", size=10),
+    font=dict(color="#ffffff", size=14),
 )
 
 def vline(x, color="#32373f"):
@@ -214,6 +216,10 @@ def hline(y, color="#32373f"):
 
 with st.sidebar:
     st.markdown("## 🎵 Bauer (1945)")
+    st.caption(
+        "📖 [User Guide](https://github.com/Balle-Clorin/tracking-angle-bauer/blob/main/USER_GUIDE.md)  ·  "
+        "Bauer, B.B. (1945). *Tracking Angle in Phonograph Pickups*. Electronics, March 1945."
+    )
     st.markdown("---")
 
     # ── Groove radii ─────────────────────────────────────────────────────────
@@ -249,10 +255,32 @@ with st.sidebar:
 
     # ── Tonearm ──────────────────────────────────────────────────────────────
     st.markdown("### Tonearm")
-    if "L" not in st.session_state:
-        st.session_state["L"] = 233.15
-    L = st.number_input("Effective length  l  (mm)", 150.0, 400.0,
-                        step=0.01, format="%.2f", key="L")
+
+    arm_input_mode = st.radio(
+        "Specify arm geometry by",
+        ["Effective length  l", "Pivot-to-spindle distance  d"],
+        key="arm_input_mode",
+        horizontal=True,
+    )
+
+    if arm_input_mode == "Effective length  l":
+        if "L" not in st.session_state:
+            st.session_state["L"] = 233.15
+        L = st.number_input("Effective length  l  (mm)", 150.0, 400.0,
+                            step=0.01, format="%.2f", key="L")
+        D0 = st.session_state.overhangs[0][0] \
+             if st.session_state.get("overhangs") else 17.8
+        d_input = L - D0
+        st.caption(f"Pivot-to-spindle  d = l − D₁ = {d_input:.2f} mm")
+    else:
+        if "d_spindle" not in st.session_state:
+            st.session_state["d_spindle"] = 215.36
+        d_input = st.number_input("Pivot-to-spindle distance  d  (mm)", 100.0, 380.0,
+                                  step=0.01, format="%.2f", key="d_spindle")
+        D0 = st.session_state.overhangs[0][0] \
+             if st.session_state.get("overhangs") else 17.8
+        L = d_input + D0
+        st.caption(f"Effective length  l = d + D₁ = {L:.2f} mm")
 
     st.caption("Head offset angle β is now set per curve above.")
 
@@ -261,15 +289,28 @@ with st.sidebar:
     st.caption("Up to 4 curves — each with its own D and β")
 
     if "overhangs" not in st.session_state:
-        st.session_state.overhangs = [(17.8, 23.63)]
+        st.session_state.overhangs = [(17.8, 23.63, L)]
 
-    # Migrate old format (list of floats) to new format (list of tuples)
-    if st.session_state.overhangs and not isinstance(st.session_state.overhangs[0], (list, tuple)):
-        st.session_state.overhangs = [(d, 23.63) for d in st.session_state.overhangs]
+    # Migrate: (D,beta) → (D,beta,L)
+    migrated = []
+    for item in st.session_state.overhangs:
+        if len(item) == 2:
+            migrated.append((item[0], item[1], L))
+        else:
+            migrated.append(item)
+    st.session_state.overhangs = migrated
 
     to_remove = None
-    for idx, (D_val, beta_val) in enumerate(st.session_state.overhangs):
-        col_d, col_b, col_x = st.columns([3, 3, 1])
+    for idx, (D_val, beta_val, L_val) in enumerate(st.session_state.overhangs):
+        col_l, col_d, col_b, col_x = st.columns([3, 3, 3, 1])
+        with col_l:
+            key_l = f"l_val_{idx}"
+            if key_l not in st.session_state:
+                st.session_state[key_l] = float(L_val)
+            new_L = st.number_input(
+                f"l{idx+1} (mm)", 100.0, 400.0,
+                step=0.01, format="%.2f", key=key_l,
+            )
         with col_d:
             key_d = f"d_val_{idx}"
             if key_d not in st.session_state:
@@ -291,48 +332,131 @@ with st.sidebar:
             if st.button("✕", key=f"rm_{idx}"):
                 to_remove = idx
             st.markdown("</div>", unsafe_allow_html=True)
-        st.session_state.overhangs[idx] = (new_D, new_beta)
+        st.session_state.overhangs[idx] = (new_D, new_beta, new_L)
 
     if to_remove is not None:
         st.session_state.overhangs.pop(to_remove)
         st.rerun()
 
-    col_add, col_eq = st.columns(2)
-    with col_add:
-        if st.button("＋ Add curve") and len(st.session_state.overhangs) < 4:
-            st.session_state.overhangs.append((17.8, 23.63))
-            st.rerun()
-    with col_eq:
-        if st.button("＋ Add Eq.22"):
-            d22 = eq22_D(L, R_INNER, R_OUTER)
-            st.session_state.overhangs.append((round(d22, 3), 0.0))
-            st.rerun()
-
     D_eq22 = eq22_D(L, R_INNER, R_OUTER)
-    if "show_eq22" not in st.session_state:
-        st.session_state["show_eq22"] = False
-    show_eq22 = st.checkbox(
-        f"Include underhung arm (Eq.22)  D = {D_eq22:.2f} mm, β = 0°",
-        key="show_eq22",
-        help="Bauer Eq.22 optimal underhung arm — negative overhang, β=0. "
-             "Y-axis rescales automatically when this is toggled."
-    )
+
+    # ── Add curve panel ───────────────────────────────────────────────────────
+    if len(st.session_state.overhangs) < 4:
+        with st.expander("＋ Add curve", expanded=False):
+            st.caption("Choose a starting point for the new curve:")
+
+            # Arm length for the new curve
+            col_lmode, col_lval = st.columns(2)
+            with col_lmode:
+                new_curve_l_mode = st.radio(
+                    "Arm length",
+                    ["Same as main  (l = {:.2f} mm)".format(L), "Custom arm length"],
+                    key="add_l_mode",
+                )
+            with col_lval:
+                if new_curve_l_mode.startswith("Custom"):
+                    if "new_curve_L" not in st.session_state:
+                        st.session_state["new_curve_L"] = L
+                    L_new = st.number_input("l new (mm)", 100.0, 400.0,
+                                            step=0.01, format="%.2f",
+                                            key="new_curve_L")
+                else:
+                    L_new = L
+                    st.caption(f"l = {L:.2f} mm")
+
+            st.markdown("**D and β starting point:**")
+
+            def _al(name): 
+                aD, ab, _, _ = solve_alignment(name, L_new, R_INNER, R_OUTER)
+                return aD, ab
+
+            add_preset = st.radio(
+                "Preset",
+                [
+                    "Löfgren A  (optimal for this arm)",
+                    "Löfgren B  (optimal for this arm)",
+                    "Stevenson  (optimal for this arm)",
+                    f"Bauer Eq.22 underhung  (β=0°)",
+                    "Copy from curve 1",
+                    "Custom — enter manually",
+                ],
+                key="add_preset_choice",
+            )
+
+            if add_preset.startswith("Löfgren A"):
+                _D, _b = _al("Löfgren A")
+            elif add_preset.startswith("Löfgren B"):
+                _D, _b = _al("Löfgren B")
+            elif add_preset.startswith("Stevenson"):
+                _D, _b = _al("Stevenson")
+            elif add_preset.startswith("Bauer Eq.22"):
+                _D, _b = eq22_D(L_new, R_INNER, R_OUTER), 0.0
+            elif add_preset.startswith("Copy"):
+                _D, _b, _ = st.session_state.overhangs[0] if st.session_state.overhangs else (17.8, 23.63, L)
+            else:
+                _D, _b = 17.8, 23.63
+
+            col_pd, col_pb = st.columns(2)
+            with col_pd:
+                new_D_add = st.number_input("D (mm)", -60.0, 100.0,
+                                            value=round(float(_D), 2),
+                                            step=0.01, format="%.2f",
+                                            key=f"new_curve_D_{add_preset}_{L_new:.0f}")
+            with col_pb:
+                new_b_add = st.number_input("β (°)", 0.0, 35.0,
+                                            value=round(float(_b), 2),
+                                            step=0.01, format="%.2f",
+                                            key=f"new_curve_b_{add_preset}_{L_new:.0f}")
+
+            st.caption(f"Will add: l = {L_new:.2f} mm  ·  D = {new_D_add:.2f} mm  ·  β = {new_b_add:.2f}°")
+
+            if st.button("Add this curve", type="primary"):
+                st.session_state.overhangs.append((new_D_add, new_b_add, L_new))
+                st.rerun()
 
     st.markdown("---")
     st.markdown("### Standard alignment (optional)")
-    st.caption("Adds a reference curve to all tabs — Löfgren / Baerwald / Stevenson")
-    REF_NAMES = ["— none —", "Löfgren A", "Löfgren B", "Stevenson"]
-    REF_COLORS = {"Löfgren A": "#f0c040", "Löfgren B": "#7ec8a0", "Stevenson": "#c07ef0"}
-    ref_choice = st.selectbox("Alignment", REF_NAMES, key="ref_alignment")
-    show_ref   = ref_choice != "— none —"
-    if show_ref:
-        ref_D, ref_beta, ref_N1, ref_N2 = solve_alignment(ref_choice, L, R_INNER, R_OUTER)
-        ref_color = REF_COLORS[ref_choice]
-        st.success(
-            f"**{ref_choice}**\n\n"
-            f"N1 = {ref_N1:.2f} mm  ·  N2 = {ref_N2:.2f} mm\n\n"
-            f"D = {ref_D:.3f} mm  ·  β = {ref_beta:.3f}°"
-        )
+    st.caption("Toggle each alignment — shown as dashed reference curves on all tabs")
+
+    REF_COLORS = {
+        "Löfgren A": "#f0c040",
+        "Löfgren B": "#7ec8a0",
+        "Stevenson": "#c07ef0",
+    }
+
+    REF_CURVES = []
+    for aname, acol in REF_COLORS.items():
+        key = f"show_{aname.replace(' ', '_')}"
+        if key not in st.session_state:
+            st.session_state[key] = False
+        if st.checkbox(aname, key=key):
+            aD, abeta, aN1, aN2 = solve_alignment(aname, L, R_INNER, R_OUTER)
+            if arm_input_mode == "Effective length  l":
+                companion = f"pivot-to-spindle d = {L - aD:.2f} mm"
+            else:
+                companion = f"effective length l = {d_input + aD:.2f} mm"
+            st.success(
+                f"**{aname}**\n\n"
+                f"N1 = {aN1:.2f} mm  ·  N2 = {aN2:.2f} mm\n\n"
+                f"D = {aD:.3f} mm  ·  β = {abeta:.3f}°\n\n"
+                f"{companion}"
+            )
+            REF_CURVES.append({"name": aname, "D": aD, "beta": abeta,
+                                "L": L,
+                                "N1": aN1, "N2": aN2, "color": acol})
+
+    if "show_eq22" not in st.session_state:
+        st.session_state["show_eq22"] = False
+    if arm_input_mode == "Effective length  l":
+        eq22_companion = f"pivot-to-spindle d = {L - D_eq22:.2f} mm"
+    else:
+        eq22_companion = f"effective length l = {d_input + D_eq22:.2f} mm"
+    show_eq22 = st.checkbox(
+        f"Bauer optimal underhung arm (Eq.22)  D = {D_eq22:.2f} mm,  β = 0°  →  {eq22_companion}",
+        key="show_eq22",
+        help="Bauer Eq.22 optimal underhung arm — negative overhang, β=0. "
+             "Y-axis rescales automatically when toggled."
+    )
 
     st.markdown("---")
     st.markdown("### Skating force (Tab 3)")
@@ -341,12 +465,15 @@ with st.sidebar:
     MU = st.number_input("Friction coefficient  µ", 0.10, 0.80,
                          step=0.01, format="%.2f", key="MU",
                          help="Bauer typical ≈ 0.25; soft vinyl / heavy stylus → higher")
+    SKATE_OPTIONS = ["Radial  (tan φ)", "Tonearm arc  (sin φ)", "Both"]
+    if "skate_mode" not in st.session_state:
+        st.session_state["skate_mode"] = "Radial  (tan φ)"
     skate_mode = st.radio(
         "Show skating force component",
-        ["Radial  µ·tan(φ)", "Tonearm arc  µ·sin(φ)", "Both"],
+        SKATE_OPTIONS,
         key="skate_mode",
-        help="Radial µ·tan(φ): force directed toward spindle along groove radius (Bauer p.112).  "
-             "Tonearm arc µ·sin(φ): side force perpendicular to the arm — "
+        help="Radial tan(φ): force directed toward spindle along groove radius (Bauer p.112).  "
+             "Tonearm arc sin(φ): side force perpendicular to the arm — "
              "this is what actually drives the arm inward along its arc.",
     )
 
@@ -361,70 +488,80 @@ with st.sidebar:
         st.session_state["RPM"] = 33.33
     RPM = st.selectbox("Record speed (rpm)", [33.33, 45.0, 78.0], key="RPM")
 
-    st.markdown("---")
-    st.caption("Bauer, B.B. (1945). *Tracking Angle in Phonograph Pickups*. Electronics, March 1945.")
-
 # ── Build r_arr and OVERHANGS list ───────────────────────────────────────────
 
 r_arr = np.linspace(R_INNER, R_OUTER, N)
 
 OVERHANG_VALUES = st.session_state.overhangs
 OVERHANGS = [
-    {"D": D, "beta": beta, "label": f"{make_label(D)}  β={beta:.2f}°",
+    {"D": D, "beta": beta, "L": L_c,
+     "label": f"l={L_c:.0f}mm  {make_label(D)}  β={beta:.2f}°",
      "color": COLORS[i % len(COLORS)]}
-    for i, (D, beta) in enumerate(OVERHANG_VALUES)
+    for i, (D, beta, L_c) in enumerate(OVERHANG_VALUES)
 ]
-# Eq.22 appended only when toggled on
-if show_eq22:
-    eq22_color = COLORS[len(OVERHANGS) % len(COLORS)]
-    OVERHANGS.append({
-        "D": D_eq22, "beta": 0.0,
-        "label": f"D = {D_eq22:.2f} mm  (Eq.22 optimal underhung, β=0)",
-        "color": eq22_color,
-        "eq22": True,
-    })
 
 omega_r  = 2 * np.pi * RPM / 60.0
 
-# ── Reference alignment trace kwargs ─────────────────────────────────────────
-if show_ref:
-    ref_kw = dict(
-        show=True, L=L, r_arr=r_arr,
-        D=ref_D, beta_deg=ref_beta, color=ref_color, name=ref_choice,
-        MU=MU, V_MOD=V_MOD, omega_r=omega_r,
-    )
-else:
-    ref_kw = dict(show=False)
+# ── Skating force component flags ─────────────────────────────────────────────
+show_radial = skate_mode in ("Radial  (tan φ)", "Both")
+show_arc    = skate_mode in ("Tonearm arc  (sin φ)", "Both")
 
-def add_ref_trace(fig, mode, kw):
-    if not kw.get("show"):
-        return
-    r   = kw["r_arr"]
-    L_  = kw["L"]
-    D_  = kw["D"]
-    br  = np.radians(kw["beta_deg"])
-    col = kw["color"]
-    nm  = kw["name"]
-    phi = tracking_angle_exact(r, L_, D_)
-    if mode == "phi":
-        y  = np.degrees(phi)
-        ht = "r = %{x:.1f} mm<br>φ = %{y:.3f}°<extra></extra>"
-    elif mode == "alpha":
-        y  = np.degrees(phi - br)
-        ht = "r = %{x:.1f} mm<br>α = %{y:.3f}°<extra></extra>"
-    elif mode == "skating":
-        # Reference curve always shows radial force µ·tan(φ)
-        y  = kw["MU"] * np.tan(phi) * 100.0
-        ht = "r = %{x:.1f} mm<br>µ·tan(φ) = %{y:.3f}%<extra></extra>"
-    elif mode == "distortion":
-        y  = distortion_pct(r, L_, D_, br, kw["V_MOD"], kw["omega_r"])
-        ht = "r = %{x:.1f} mm<br>HD2 = %{y:.3f}%<extra></extra>"
-    lbl = f"{nm}<br>D={D_:.2f}mm  β={kw['beta_deg']:.2f}°"
-    fig.add_trace(go.Scatter(
-        x=r, y=y, name=lbl,
-        line=dict(color=col, width=2.0, dash="dashdot"),
-        hovertemplate=ht,
-    ))
+# ── Add Eq.22 to REF_CURVES if toggled ───────────────────────────────────────
+if show_eq22:
+    REF_CURVES.append({"name": "Eq.22 underhung", "D": D_eq22, "beta": 0.0,
+                        "L": L,
+                        "N1": None, "N2": None,
+                        "color": COLORS[len(OVERHANGS) % len(COLORS)]})
+
+def add_ref_traces(fig, mode):
+    """Add all active reference alignment curves to fig."""
+    for rc in REF_CURVES:
+        D_   = rc["D"]
+        L_   = rc.get("L", L)
+        br   = np.radians(rc["beta"])
+        col  = rc["color"]
+        nm   = rc["name"]
+        phi  = tracking_angle_exact(r_arr, L_, D_)
+        lbl_base = f"{nm}<br>l={L_:.0f}mm  D={D_:.2f}mm  β={rc['beta']:.2f}°"
+
+        if mode == "phi":
+            fig.add_trace(go.Scatter(
+                x=r_arr, y=np.degrees(phi), name=lbl_base,
+                line=dict(color=col, width=2.0, dash="dashdot"),
+                hovertemplate="r = %{x:.1f} mm<br>φ = %{y:.3f}°<extra></extra>",
+            ))
+
+        elif mode == "alpha":
+            fig.add_trace(go.Scatter(
+                x=r_arr, y=np.degrees(phi - br), name=lbl_base,
+                line=dict(color=col, width=2.0, dash="dashdot"),
+                hovertemplate="r = %{x:.1f} mm<br>α = %{y:.3f}°<extra></extra>",
+            ))
+
+        elif mode == "skating":
+            if show_radial:
+                lbl = lbl_base + ("  · tan(φ)" if show_arc else "")
+                fig.add_trace(go.Scatter(
+                    x=r_arr, y=MU * np.tan(phi) * 100.0, name=lbl,
+                    line=dict(color=col, width=2.5, dash="dashdot"),
+                    hovertemplate="r = %{x:.1f} mm<br>µ·tan(φ) = %{y:.3f}%<extra></extra>",
+                ))
+            if show_arc:
+                lbl = lbl_base + ("  · sin(φ)" if show_radial else "")
+                fig.add_trace(go.Scatter(
+                    x=r_arr, y=MU * np.sin(phi) * 100.0, name=lbl,
+                    line=dict(color=col, width=1.2, dash="dashdot"),
+                    hovertemplate="r = %{x:.1f} mm<br>µ·sin(φ) = %{y:.3f}%<extra></extra>",
+                ))
+
+        elif mode == "distortion":
+            fig.add_trace(go.Scatter(
+                x=r_arr,
+                y=distortion_pct(r_arr, L_, D_, br, V_MOD, omega_r),
+                name=lbl_base,
+                line=dict(color=col, width=2.0, dash="dashdot"),
+                hovertemplate="r = %{x:.1f} mm<br>HD2 = %{y:.3f}%<extra></extra>",
+            ))
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # HEADER
@@ -456,9 +593,10 @@ with tab1:
         # Use first non-eq22 curve for illustration
         diag_cfg   = next((c for c in OVERHANGS if not c.get("eq22")), OVERHANGS[0])
         DIAG_D     = diag_cfg["D"]
+        DIAG_L     = diag_cfg["L"]
         DIAG_color = diag_cfg["color"]
         r_diag     = (R_INNER + R_OUTER) / 2
-        d_pivot    = L - DIAG_D
+        d_pivot    = DIAG_L - DIAG_D
 
         # Place pivot at ~70° CCW from +x (upper-right of platter centre O)
         PIVOT_ANG = np.radians(70.0)
@@ -479,7 +617,7 @@ with tab1:
         rad_dir  = needle_geo / np.linalg.norm(needle_geo)
         tang_dir = np.array([-rad_dir[1], rad_dir[0]])
 
-        phi_diag     = tracking_angle_exact(r_diag, L, DIAG_D)
+        phi_diag     = tracking_angle_exact(r_diag, DIAG_L, DIAG_D)
         phi_diag_deg = np.degrees(phi_diag)
 
         # Build Plotly figure
@@ -544,12 +682,12 @@ with tab1:
                 x=0, y=-abs(DIAG_D), ax=0, ay=0,
                 axref="x", ayref="y", xref="x", yref="y",
                 arrowhead=2, arrowsize=1, arrowwidth=1.5,
-                arrowcolor="#8fc99b", showarrow=True)
+                arrowcolor="#6db87a", showarrow=True)
             sign = "+" if DIAG_D >= 0 else ""
             fig_geo.add_annotation(
                 x=8, y=-abs(DIAG_D)/2,
                 text=f"D={sign}{DIAG_D:.1f} mm",
-                showarrow=False, font=dict(color="#8fc99b", size=10))
+                showarrow=False, font=dict(color="#6db87a", size=14))
 
         # Points: O, P, stylus
         fig_geo.add_trace(go.Scatter(
@@ -559,14 +697,14 @@ with tab1:
                         size=[8, 10, 8]),
             text=["O", "P (pivot)", "stylus"],
             textposition=["top right", "top right", "bottom right"],
-            textfont=dict(color="#8a919e", size=9),
+            textfont=dict(color="#ffffff", size=14),
             showlegend=False))
 
         # Labels: d, l, r
         mid_d = pivot_geo * 0.45
         fig_geo.add_annotation(x=mid_d[0]+8, y=mid_d[1],
             text=f"d={d_pivot:.0f} mm", showarrow=False,
-            font=dict(color="#6a8090", size=9))
+            font=dict(color="#ffffff", size=14))
         arm_mid = (pivot_geo + needle_geo) / 2
         arm_perp = np.array([-( needle_geo[1]-pivot_geo[1]),
                                needle_geo[0]-pivot_geo[0]])
@@ -574,35 +712,35 @@ with tab1:
         lp = arm_mid + arm_perp * 12
         fig_geo.add_annotation(x=lp[0], y=lp[1],
             text=f"l={L:.0f} mm", showarrow=False,
-            font=dict(color=DIAG_color, size=9))
+            font=dict(color=DIAG_color, size=14))
         rp = needle_geo * 0.48
         fig_geo.add_annotation(x=rp[0]-8, y=rp[1]-6,
             text=f"r={r_diag:.0f} mm", showarrow=False,
-            font=dict(color="#5a7080", size=9))
+            font=dict(color="#ffffff", size=14))
         # φ label on arc
         mid_arc = np.radians((a1_arc + a2_arc) / 2)
         fig_geo.add_annotation(
             x=needle_geo[0] + 32*np.cos(mid_arc),
             y=needle_geo[1] + 32*np.sin(mid_arc),
             text=f"φ={phi_diag_deg:.1f}°", showarrow=False,
-            font=dict(color="#c96e85", size=10))
+            font=dict(color="#c96e85", size=14))
 
         all_x = [0, px, needle_geo[0]]
         all_y = [0, py, needle_geo[1], -abs(DIAG_D)-10]
         pad = 35
         fig_geo.update_layout(
             paper_bgcolor="#1a1d23", plot_bgcolor="#12151a",
-            font=dict(family="IBM Plex Mono, monospace", color="#8a919e", size=11),
+            font=dict(family="IBM Plex Mono, monospace", color="#ffffff", size=13),
             title=dict(
                 text=f"Fig. 1(a) — Pivot / record / needle geometry<br>"
-                     f"<sup>D={DIAG_D:+.1f} mm · r={r_diag:.0f} mm · l={L:.0f} mm</sup>",
-                font=dict(color="#dce1e9", size=11)),
+                     f"<sup>D={DIAG_D:+.1f} mm · r={r_diag:.0f} mm · l={DIAG_L:.0f} mm</sup>",
+                font=dict(color="#ffffff", size=13)),
             xaxis=dict(title="mm", gridcolor="#22262e", zerolinecolor="#32373f",
-                       tickcolor="#8a919e",
+                       tickcolor="#ffffff",
                        range=[min(all_x)-pad, max(all_x)+pad],
                        scaleanchor="y", scaleratio=1),
             yaxis=dict(title="mm", gridcolor="#22262e", zerolinecolor="#32373f",
-                       tickcolor="#8a919e",
+                       tickcolor="#ffffff",
                        range=[min(all_y)-pad, max(all_y)+pad]),
             height=480,
             margin=dict(l=50, r=10, t=70, b=50),
@@ -615,7 +753,7 @@ with tab1:
     with col_plot:
         fig1 = go.Figure()
         for cfg in OVERHANGS:
-            phi = np.degrees(tracking_angle_exact(r_arr, L, cfg["D"]))
+            phi = np.degrees(tracking_angle_exact(r_arr, cfg["L"], cfg["D"]))
             fig1.add_trace(go.Scatter(
                 x=r_arr, y=phi, name=cfg["label"],
                 line=dict(color=cfg["color"],
@@ -624,11 +762,11 @@ with tab1:
                 hovertemplate="r = %{x:.1f} mm<br>φ = %{y:.3f}°<extra></extra>",
             ))
 
-        add_ref_trace(fig1, "phi", ref_kw)
+        add_ref_traces(fig1, "phi")
         fig1.update_layout(
             **LAYOUT_BASE,
             title=dict(text="Fig. 1(b) — Tracking angle φ vs groove radius  [Bauer Eq. 4, exact]",
-                       font=dict(color="#dce1e9", size=11)),
+                       font=dict(color="#ffffff", size=13)),
             xaxis_title="Groove radius  r  (mm)",
             yaxis_title="Tracking angle  φ  (degrees)",
             shapes=[vline(R_INNER), vline(R_OUTER), hline(0)],
@@ -645,11 +783,11 @@ with tab1:
     rows_html = ""
     for cfg in OVERHANGS:
         D = cfg["D"]
+        phi_i = np.degrees(tracking_angle_exact(R_INNER, cfg["L"], D))
+        phi_o = np.degrees(tracking_angle_exact(R_OUTER, cfg["L"], D))
+        phi_m = np.degrees(tracking_angle_exact((R_INNER+R_OUTER)/2, cfg["L"], D))
+        phi_a = tracking_angle_exact(r_arr, cfg["L"], D)
         beta_rad = np.radians(cfg["beta"])
-        phi_a = tracking_angle_exact(r_arr, L, D)
-        phi_i = np.degrees(tracking_angle_exact(R_INNER, L, D))
-        phi_o = np.degrees(tracking_angle_exact(R_OUTER, L, D))
-        phi_m = np.degrees(tracking_angle_exact((R_INNER+R_OUTER)/2, L, D))
         alpha_a = phi_a - beta_rad
         nulls = find_nulls(alpha_a, r_arr)
         null_str = ", ".join(f"{z:.1f}" for z in nulls) + " mm" if nulls else "—"
@@ -679,7 +817,7 @@ with tab2:
     all_alpha = []
     for cfg in OVERHANGS:
         beta_use = 0.0 if cfg.get("eq22") else np.radians(cfg["beta"])
-        all_alpha.append(np.degrees(tracking_angle_exact(r_arr, L, cfg["D"]) - beta_use))
+        all_alpha.append(np.degrees(tracking_angle_exact(r_arr, cfg["L"], cfg["D"]) - beta_use))
     all_alpha = np.concatenate(all_alpha)
     data_ymin = float(np.floor(all_alpha.min()))
     data_ymax = float(np.ceil(all_alpha.max()))
@@ -707,7 +845,7 @@ with tab2:
 
     for cfg in OVERHANGS:
         D         = cfg["D"]
-        phi_arr   = tracking_angle_exact(r_arr, L, D)
+        phi_arr   = tracking_angle_exact(r_arr, cfg["L"], D)
         beta_use  = 0.0 if cfg.get("eq22") else np.radians(cfg["beta"])
         alpha_arr = np.degrees(phi_arr - beta_use)
         nulls     = find_nulls(phi_arr - beta_use, r_arr)
@@ -731,12 +869,12 @@ with tab2:
                               line=dict(color=cfg["color"], width=1, dash="dot"),
                               opacity=0.6)
 
-    add_ref_trace(fig_err, "alpha", ref_kw)
+    add_ref_traces(fig_err, "alpha")
     fig_err.update_layout(
         **LAYOUT_BASE,
         title=dict(
             text="Tracking error  α = φ − β   [Bauer Eq. 4 exact]",
-            font=dict(color="#dce1e9", size=12)),
+            font=dict(color="#ffffff", size=14)),
         xaxis_title="Groove radius  r  (mm)",
         yaxis_title="Tracking error  α  (degrees)",
         yaxis_range=[y_lo, y_hi],
@@ -757,7 +895,7 @@ with tab2:
     for col, cfg in zip(null_cols, OVERHANGS):
         D         = cfg["D"]
         beta_use  = 0.0 if cfg.get("eq22") else np.radians(cfg["beta"])
-        alpha_arr = tracking_angle_exact(r_arr, L, D) - beta_use
+        alpha_arr = tracking_angle_exact(r_arr, cfg["L"], D) - beta_use
         nulls     = find_nulls(alpha_arr, r_arr)
         color     = cfg["color"]
         null_rows = "".join(f"<div class='value null-row'>{z:.1f} mm</div>" for z in nulls)
@@ -787,36 +925,31 @@ with tab2:
 with tab3:
     fig2 = go.Figure()
 
-    show_radial = skate_mode in ("Radial  µ·tan(φ)", "Both")
-    show_arc    = skate_mode in ("Tonearm arc  µ·sin(φ)", "Both")
-
     for cfg in OVERHANGS:
-        phi_arr = tracking_angle_exact(r_arr, L, cfg["D"])
-        lw   = 2.2 if cfg.get("eq22") else 1.8
-        dash = "dash" if cfg.get("eq22") else "solid"
+        phi_arr = tracking_angle_exact(r_arr, cfg["L"], cfg["D"])
+        is_eq22 = cfg.get("eq22")
+        dash = "dash" if is_eq22 else "solid"
         col  = cfg["color"]
 
         if show_radial:
             fr_radial = MU * np.tan(phi_arr) * 100.0
-            name_r = cfg["label"] + ("  [tan]" if show_arc else "")
+            name_r = cfg["label"] + ("  · tan(φ)" if show_arc else "")
             fig2.add_trace(go.Scatter(
                 x=r_arr, y=fr_radial, name=name_r,
-                line=dict(color=col, width=lw, dash=dash),
+                line=dict(color=col, width=2.5, dash=dash),
                 hovertemplate="r = %{x:.1f} mm<br>µ·tan(φ) = %{y:.3f} %<extra></extra>",
             ))
 
         if show_arc:
             fr_arc = MU * np.sin(phi_arr) * 100.0
-            name_a = cfg["label"] + ("  [sin]" if show_radial else "")
-            # Slightly lighter/dotted when shown alongside radial
-            dash_a = "dot" if show_radial else dash
+            name_a = cfg["label"] + ("  · sin(φ)" if show_radial else "")
             fig2.add_trace(go.Scatter(
                 x=r_arr, y=fr_arc, name=name_a,
-                line=dict(color=col, width=lw, dash=dash_a),
+                line=dict(color=col, width=1.2, dash=dash),
                 hovertemplate="r = %{x:.1f} mm<br>µ·sin(φ) = %{y:.3f} %<extra></extra>",
             ))
 
-    add_ref_trace(fig2, "skating", ref_kw)
+    add_ref_traces(fig2, "skating")
 
     # Build title and y-axis label from mode
     if show_radial and show_arc:
@@ -831,7 +964,7 @@ with tab3:
 
     fig2.update_layout(
         **LAYOUT_BASE,
-        title=dict(text=title_txt, font=dict(color="#dce1e9", size=12)),
+        title=dict(text=title_txt, font=dict(color="#ffffff", size=14)),
         xaxis_title="Groove radius  r  (mm)",
         yaxis_title=yaxis_lbl,
         shapes=[vline(R_INNER), vline(R_OUTER), hline(0)],
@@ -846,8 +979,10 @@ with tab3:
     st.caption(
         f"**Radial force** µ·Fv·tan(φ): force directed toward the spindle along the groove radius (Bauer p.112).  "
         f"**Tonearm arc force** µ·Fv·sin(φ): component perpendicular to the tonearm — "
-        f"this is the side force that drives the arm inward along its pivot arc.  "
-        f"For typical offset angles (20–25°) the difference between tan and sin is can be shown, as you can choose to plot both.  "
+        f"the side force that drives the arm inward along its pivot arc.  "
+        f"For overhung arms (φ ≈ 20–25°) tan and sin differ by ~8–10%, clearly visible when both are plotted.  "
+        f"For underhung arms (φ ≈ −6° to +13°) the angles are small so tan and sin differ by less than 2.5% — "
+        f"the two curves nearly overlap, which is physically correct.  "
         f"µ = {MU:.2f}."
     )
 
@@ -858,12 +993,6 @@ with tab3:
 with tab4:
     fig3 = go.Figure()
 
-    # 2.2% Bauer reference line
-    fig3.add_hline(y=2.2, line=dict(color="#ffffff", width=0.8, dash="dot"),
-                   opacity=0.3,
-                   annotation_text="2.2 % (Bauer ref, straight arm)",
-                   annotation_font=dict(color="#8a919e", size=9),
-                   annotation_position="bottom right")
 
     for cfg in OVERHANGS:
         D        = cfg["D"]
@@ -871,8 +1000,8 @@ with tab4:
         label    = cfg["label"]
         lw, dash = (2.2, "dash") if cfg.get("eq22") else (1.8, "solid")
 
-        dp        = distortion_pct(r_arr, L, D, beta_use, V_MOD, omega_r)
-        alpha_arr = tracking_angle_exact(r_arr, L, D) - beta_use
+        dp        = distortion_pct(r_arr, cfg["L"], D, beta_use, V_MOD, omega_r)
+        alpha_arr = tracking_angle_exact(r_arr, cfg["L"], D) - beta_use
         nulls     = find_nulls(alpha_arr, r_arr)
 
         hover = "r = %{x:.1f} mm<br>HD2 = %{y:.3f} %"
@@ -891,13 +1020,13 @@ with tab4:
             fig3.add_vline(x=z, line=dict(color=cfg["color"], width=0.8, dash="dot"),
                            opacity=0.5)
 
-    add_ref_trace(fig3, "distortion", ref_kw)
+    add_ref_traces(fig3, "distortion")
     fig3.update_layout(
         **LAYOUT_BASE,
         title=dict(
             text=f"2nd-order distortion  [Bauer Eq. 16, velocity basis]   "
                  f"ωA = {V_MOD:.0f} mm/s  ·  {RPM:.2f} rpm",
-            font=dict(color="#dce1e9", size=12)),
+            font=dict(color="#ffffff", size=14)),
         xaxis_title="Groove radius  r  (mm)",
         yaxis_title="2nd harmonic distortion  (%)",
         shapes=[vline(R_INNER), vline(R_OUTER)],
@@ -915,7 +1044,7 @@ with tab4:
     for col, cfg in zip(null_cols, OVERHANGS):
         D         = cfg["D"]
         beta_use  = 0.0 if cfg.get("eq22") else np.radians(cfg["beta"])
-        alpha_arr = tracking_angle_exact(r_arr, L, D) - beta_use
+        alpha_arr = tracking_angle_exact(r_arr, cfg["L"], D) - beta_use
         nulls     = find_nulls(alpha_arr, r_arr)
         with col:
             color     = cfg["color"]
