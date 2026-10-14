@@ -646,10 +646,10 @@ with tab1:
     for cfg in OVERHANGS:
         D = cfg["D"]
         beta_rad = np.radians(cfg["beta"])
-        phi_a = tracking_angle_exact(r_arr, cfg["L"], D)
-        phi_i = np.degrees(tracking_angle_exact(R_INNER, cfg["L"], D))
-        phi_o = np.degrees(tracking_angle_exact(R_OUTER, cfg["L"], D))
-        phi_m = np.degrees(tracking_angle_exact((R_INNER+R_OUTER)/2, cfg["L"], D))
+        phi_a = tracking_angle_exact(r_arr, L, D)
+        phi_i = np.degrees(tracking_angle_exact(R_INNER, L, D))
+        phi_o = np.degrees(tracking_angle_exact(R_OUTER, L, D))
+        phi_m = np.degrees(tracking_angle_exact((R_INNER+R_OUTER)/2, L, D))
         alpha_a = phi_a - beta_rad
         nulls = find_nulls(alpha_a, r_arr)
         null_str = ", ".join(f"{z:.1f}" for z in nulls) + " mm" if nulls else "—"
