@@ -480,8 +480,8 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### Distortion (Tab 4)")
     if "V_MOD" not in st.session_state:
-        st.session_state["V_MOD"] = 100.0
-    V_MOD = st.number_input("Peak modulation velocity  ωA  (mm/s)", 20.0, 150.0,
+        st.session_state["V_MOD"] = 50.0
+    V_MOD = st.number_input("Peak modulation velocity  ωA  (mm/s)", 1.0, 150.0,
                             step=0.5, format="%.1f", key="V_MOD",
                             help="Bauer ref ≈ 67 mm/s; commercial pressings often higher")
     if "RPM" not in st.session_state:
